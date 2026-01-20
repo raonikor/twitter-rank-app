@@ -17,7 +17,7 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* 리더보드 리스트 스타일 */
+    /* 리더보드 리스트 스타일 (슬림) */
     .ranking-row { 
         display: flex; align-items: center; justify-content: space-between; 
         background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
@@ -115,13 +115,12 @@ if not df.empty:
 
     # 메인 차트 (트리맵)
     if not display_df.empty:
-        # [핵심] 차트 설정 변경
         fig = px.treemap(
             display_df, 
-            path=['category', 'handle'], # 경로는 handle(고유ID)로 설정하여 중복 방지
+            path=['category', 'handle'], 
             values='followers', 
             color='followers',
-            custom_data=['name'], # [중요] 'name' 데이터를 커스텀 데이터로 넘김
+            custom_data=['name'], 
             color_continuous_scale=[
                 (0.0, '#3F3C5C'), (0.1, '#4A477A'), (0.2, '#4A6FA5'), (0.3, '#5C8BAE'),
                 (0.4, '#5E9CA8'), (0.5, '#5F9E7F'), (0.6, '#859E5F'), (0.7, '#A89E5F'),
@@ -131,15 +130,14 @@ if not df.empty:
         )
         
         fig.update_traces(
-            # [화면 표시] %{customdata[0]} = 이름. (핸들은 표시 안 함)
             texttemplate='<b>%{customdata[0]}</b><br><b style="font-size:1.2em">%{value:,.0f}</b><br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
-            
             textfont=dict(size=20, family="sans-serif", color="white"),
             textposition="middle center",
-            marker=dict(line=dict(width=6, color='#0F1115')), 
-            root_color="#16191E",
             
-            # [마우스 호버] 여기서 이름과 @핸들(%{label})을 같이 보여줌
+            # [핵심 변경] width를 6 -> 2로 줄임 (간격 축소)
+            marker=dict(line=dict(width=2, color='#0F1115')), 
+            
+            root_color="#16191E",
             hovertemplate='<b>%{customdata[0]}</b><br><span style="color:#9CA3AF">@%{label}</span><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
         )
         
