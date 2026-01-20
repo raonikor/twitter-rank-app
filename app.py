@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
-import numpy as np # 로그 계산을 위해 numpy 추가
+import numpy as np
 
 # 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵", layout="wide")
@@ -116,17 +116,17 @@ if not df.empty:
 
     # 메인 차트 (트리맵)
     if not display_df.empty:
-        # [핵심] 로그 스케일 컬럼 생성 (0을 방지하기 위해 1을 더함)
+        # 로그 스케일 컬럼 생성
         display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
         
         fig = px.treemap(
             display_df, 
             path=['category', 'handle'], 
-            values='followers',      # 크기는 실제 팔로워 수 기준
-            color='log_followers',   # [핵심] 색상은 로그 스케일 기준 (하위권 색상 분별력 UP)
+            values='followers', 
+            color='log_followers',
             custom_data=['name'], 
             
-            # [핵심] 20단계 컬러 스케일 (다크 인디고 -> 블루 -> 민트 -> 옐로우 -> 레드)
+            # 20단계 컬러 스케일
             color_continuous_scale=[
                 (0.00, '#2E2B4E'), (0.05, '#353263'), (0.10, '#3F3C5C'), (0.15, '#464282'),
                 (0.20, '#4A477A'), (0.25, '#4A5D91'), (0.30, '#4A6FA5'), (0.35, '#537CA8'),
@@ -142,10 +142,11 @@ if not df.empty:
             texttemplate='<b>%{customdata[0]}</b><br><b style="font-size:1.2em">%{value:,.0f}</b><br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
             textfont=dict(size=20, family="sans-serif", color="white"),
             textposition="middle center",
-            marker=dict(line=dict(width=1, color='#000000')), # 1px 초밀착 간격
-            root_color="#000000",
             
-            # 호버에서는 여전히 실제 팔로워 수(%{value})가 나옵니다.
+            # [핵심 변경] width를 3으로 설정하여 외곽선을 적당히 두껍게
+            marker=dict(line=dict(width=3, color='#000000')), 
+            
+            root_color="#000000",
             hovertemplate='<b>%{customdata[0]}</b><br><span style="color:#9CA3AF">@%{label}</span><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
         )
         
