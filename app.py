@@ -3,28 +3,56 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 
-# 1. 페이지 설정 및 다크 테마 커스텀 CSS 적용
-st.set_page_config(page_title="Twitter Mindshare (Dark)", layout="wide")
+# 1. 페이지 설정 및 다크 테마 강제 적용
+st.set_page_config(page_title="Twitter Mindshare Pro", layout="wide")
 
-# CSS를 사용하여 강제로 다크 모드 스타일 적용
+# [핵심] 다크 모드 통합 디자인 CSS
 st.markdown("""
     <style>
-    .main { background-color: #0E1117; color: #FAFAFA; }
-    .stSidebar { background-color: #262730; }
-    .st-at { background-color: #0E1117; }
+    /* 전체 배경 및 기본 글자색 */
+    .stApp {
+        background-color: #0E1117;
+        color: #FFFFFF;
+    }
+    /* 사이드바 스타일링 */
+    [data-testid="stSidebar"] {
+        background-color: #1A1C24;
+    }
+    /* 사이드바 내 모든 텍스트 흰색 고정 */
+    [data-testid="stSidebar"] .stText, [data-testid="stSidebar"] label, [data-testid="stSidebar"] p {
+        color: #FFFFFF !important;
+    }
+    /* 탭 메뉴 디자인 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 24px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        color: #808495;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #FFFFFF;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #FFFFFF !important;
+        border-bottom-color: #FFFFFF !important;
+    }
+    /* 입력창 배경색 조정 */
+    input {
+        background-color: #262730 !important;
+        color: #FFFFFF !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. 구글 시트 연결 및 데이터 전처리
+# 2. 구글 시트 데이터 로드
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_clean_data():
     try:
         df = conn.read(ttl="1m")
         if df is not None and not df.empty:
-            # 팔로워 숫자 전처리
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
-            # 카테고리 전처리
             if 'category' not in df.columns:
                 df['category'] = '미분류'
             else:
@@ -35,9 +63,9 @@ def get_clean_data():
 
 df_handles = get_clean_data()
 
-# 3. 사이드바 구성
+# 3. 사이드바 (분류 필터)
 with st.sidebar:
-    st.title("🌙 다크 모드 필터")
+    st.markdown("## 📂 분류 필터")
     
     available_cats = ["전체보기"]
     if not df_handles.empty:
@@ -46,13 +74,13 @@ with st.sidebar:
     
     selected_category = st.radio("그룹을 선택하세요", available_cats)
 
-    # 관리자 메뉴 숨기기 (하단 배치)
-    for _ in range(20): st.write("") 
-    with st.expander("⚙️", expanded=False):
-        admin_pw = st.text_input("System Key", type="password", label_visibility="collapsed")
+    # 관리자 메뉴를 하단에 은밀하게 배치
+    for _ in range(25): st.write("") 
+    with st.expander("⚙️ System", expanded=False):
+        admin_pw = st.text_input("Key", type="password", label_visibility="collapsed")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
 
-# 4. 메인 대시보드
+# 4. 메인 화면
 st.title(f"📊 {selected_category} 마인드쉐어")
 
 if not df_handles.empty:
@@ -61,35 +89,38 @@ if not df_handles.empty:
     else:
         display_df = df_handles[(df_handles['category'] == selected_category) & (df_handles['followers'] > 0)]
 
-    # 차트 출력 (다크 테마 적용)
     if not display_df.empty:
+        # 차트 템플릿을 plotly_dark로 설정하여 일체감 부여
         fig = px.treemap(
             display_df, 
             path=['category', 'handle'], 
             values='followers',
             color='category',
-            hover_data=['followers'],
-            color_discrete_sequence=px.colors.qualitative.Set3,
-            template="plotly_dark" # [핵심] 차트 배경을 어둡게 설정
+            template="plotly_dark",
+            color_discrete_sequence=px.colors.qualitative.Pastel
         )
-        fig.update_layout(margin=dict(t=30, l=10, r=10, b=10))
+        fig.update_layout(
+            margin=dict(t=30, l=10, r=10, b=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color="white")
+        )
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("표시할 데이터가 없습니다.")
-else:
-    st.warning("데이터를 불러올 수 없습니다.")
+        st.info("해당 카테고리에 데이터가 없습니다.")
 
-# 5. 관리자 데이터 편집기
+# 5. 관리자 편집기
 if is_admin:
     st.divider()
-    st.header("🛠️ 관리자 모드 (다크)")
+    st.header("🛠️ 마스터 데이터 관리")
+    # 다크 모드용 데이터 에디터는 자동으로 테마를 따라감
     edited_df = st.data_editor(df_handles, use_container_width=True, num_rows="dynamic")
 
-    if st.button("💾 모든 수정사항 저장"):
+    if st.button("💾 모든 수정사항 클라우드 저장"):
         try:
             conn.update(worksheet="Sheet1", data=edited_df)
-            st.success("저장 완료!")
+            st.success("데이터가 성공적으로 업데이트되었습니다!")
             st.cache_data.clear()
             st.rerun()
         except Exception as e:
-            st.error(f"저장 실패: {e}")
+            st.error(f"저장 중 오류 발생: {e}")
