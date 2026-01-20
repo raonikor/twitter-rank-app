@@ -6,10 +6,10 @@ import plotly.express as px
 # 1. 페이지 설정
 st.set_page_config(page_title="Korean Community Mindshare", layout="wide")
 
-# 2. [디자인 핵심] Bridge 스타일 + 리더보드 리스트 CSS
+# 2. [디자인 핵심] Bridge 스타일 + 리더보드/트리맵 통합 CSS
 st.markdown("""
     <style>
-    /* 전체 배경: 딥 다크 */
+    /* 전체 배경: 딥 다크 (#0F1115) */
     .stApp {
         background-color: #0F1115; 
         color: #FFFFFF;
@@ -29,58 +29,36 @@ st.markdown("""
         padding: 20px;
         text-align: left;
         margin-bottom: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
     }
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* [NEW] 리더보드(순위) 리스트 스타일 */
+    /* 리더보드(순위) 리스트 스타일 (이전과 동일) */
     .ranking-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        background-color: #16191E; /* 사이드바와 같은 톤 */
+        background-color: #16191E;
         border: 1px solid #2D3035;
         border-radius: 6px;
         padding: 15px 20px;
         margin-bottom: 8px;
         transition: all 0.2s ease;
     }
-    /* 마우스 올렸을 때 효과 (이미지의 녹색 포인트 반영) */
     .ranking-row:hover {
-        border-color: #10B981; /* Bridge Green */
+        border-color: #10B981; /* Bridge Green Hover */
         background-color: #1C1F26;
-        transform: translateX(5px); /* 살짝 오른쪽으로 이동 */
+        transform: translateX(5px);
     }
-    
-    .rank-num {
-        font-size: 18px;
-        font-weight: bold;
-        color: #10B981; /* 순위 숫자 녹색 */
-        width: 40px;
-    }
-    .rank-handle {
-        font-size: 16px;
-        font-weight: 600;
-        color: #E5E7EB;
-        flex-grow: 1; /* 중간 공간 차지 */
-        padding-left: 10px;
-    }
-    .rank-followers {
-        font-size: 16px;
-        color: #9CA3AF;
-        text-align: right;
-    }
-    .rank-category {
-        font-size: 12px;
-        color: #6B7280;
-        background-color: #374151;
-        padding: 2px 8px;
-        border-radius: 12px;
-        margin-right: 15px;
-    }
+    .rank-num { font-size: 18px; font-weight: bold; color: #10B981; width: 40px; }
+    .rank-handle { font-size: 16px; font-weight: 600; color: #E5E7EB; flex-grow: 1; padding-left: 10px; }
+    .rank-followers { font-size: 16px; color: #9CA3AF; text-align: right; }
+    .rank-category { font-size: 12px; color: #6B7280; background-color: #374151; padding: 2px 8px; border-radius: 12px; margin-right: 15px; }
     
     /* 텍스트 및 차트 스타일 */
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
+    /* Plotly 차트 배경 투명화 */
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -134,50 +112,57 @@ if not df.empty:
     total_fol = display_df['followers'].sum()
     top_one = display_df.loc[display_df['followers'].idxmax()]['handle'] if not display_df.empty else "-"
     
-    with col1:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">전체 계정</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">총 팔로워</div><div class="metric-value">{total_fol:,.0f}</div></div>', unsafe_allow_html=True)
-    with col3:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">최고 영향력</div><div class="metric-value">{top_one}</div></div>', unsafe_allow_html=True)
-    with col4:
-        st.markdown(f'<div class="metric-card"><div class="metric-label">기간</div><div class="metric-value">7일</div></div>', unsafe_allow_html=True)
+    with col1: st.markdown(f'<div class="metric-card"><div class="metric-label">전체 계정</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
+    with col2: st.markdown(f'<div class="metric-card"><div class="metric-label">총 팔로워</div><div class="metric-value">{total_fol:,.0f}</div></div>', unsafe_allow_html=True)
+    with col3: st.markdown(f'<div class="metric-card"><div class="metric-label">최고 영향력</div><div class="metric-value">{top_one}</div></div>', unsafe_allow_html=True)
+    with col4: st.markdown(f'<div class="metric-card"><div class="metric-label">기간</div><div class="metric-value">7일</div></div>', unsafe_allow_html=True)
 
     st.write("") # 간격
 
-    # 5-2. 메인 차트 (트리맵)
+    # 5-2. [핵심 변경] 메인 차트 (트리맵 - 리더보드 스타일 적용)
     if not display_df.empty:
+        # Bridge 스타일 컬러 팔레트
+        bridge_colors = ['#D97706', '#2563EB', '#059669', '#DC2626', '#7C3AED', '#DB2777']
+
         fig = px.treemap(
             display_df, 
             path=['category', 'handle'], 
             values='followers',
             color='category',
-            color_discrete_sequence=['#D97706', '#2563EB', '#059669', '#DC2626', '#7C3AED'],
+            color_discrete_sequence=bridge_colors,
             template="plotly_dark"
         )
+        
+        # [스타일링 핵심] 블록 간격을 넓혀 카드처럼 보이게 함
         fig.update_traces(
             textinfo="label+value",
-            textfont=dict(size=20, family="Arial", color="white"),
-            marker=dict(line=dict(width=2, color='#0F1115')),
-            root_color="#16191E"
+            # 폰트를 더 크고 두껍게
+            textfont=dict(size=24, family="sans-serif", weight="bold", color="white"),
+            textposition="middle center",
+            # 테두리 선을 메인 배경색(#0F1115)과 동일하게 하고 두께를 늘려 '틈'을 만듦
+            marker=dict(line=dict(width=3, color='#0F1115')),
+            root_color="#16191E", # 배경 톤 일치
+            # 호버 템플릿 깔끔하게 정리
+            hovertemplate='<b>%{label}</b><br>Followers: %{value:,.0f}<extra></extra>'
         )
-        fig.update_layout(margin=dict(t=20, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)', height=500)
+        
+        fig.update_layout(
+            margin=dict(t=0, l=0, r=0, b=0), # 여백 제거
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=600, # 높이 키움
+            font=dict(family="sans-serif")
+        )
         st.plotly_chart(fig, use_container_width=True)
 
-        # 5-3. [핵심 변경] 리더보드 스타일 순위 리스트
+        # 5-3. 리더보드 순위 리스트 (이전과 동일)
         st.write("")
         st.subheader("🏆 채널 랭킹 (Leaderboard)")
-        
-        # 데이터를 팔로워 순으로 정렬
         ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
-        
-        # 리스트 출력 (HTML 생성)
         list_html = ""
         for index, row in ranking_df.iterrows():
             rank = index + 1
-            # 상위 3등까지는 왕관 이모지 추가 (선택사항)
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
-            
             list_html += f"""
             <div class="ranking-row">
                 <div class="rank-num">{medal}</div>
@@ -186,8 +171,6 @@ if not df.empty:
                 <div class="rank-followers">{int(row['followers']):,} 팔로워</div>
             </div>
             """
-        
-        # 스크롤 가능한 영역에 리스트 표시 (너무 길어질 경우 대비)
         with st.container(height=400):
             st.markdown(list_html, unsafe_allow_html=True)
 
