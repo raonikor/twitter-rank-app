@@ -42,30 +42,48 @@ with tab2:
     if pw == ADMIN_PASSWORD:
         st.header("🛠️ 채널 및 팔로워 관리")
         
-        # [수정 부분] 핸들과 팔로워 숫자를 동시에 입력받음
-        col1, col2 = st.columns(2)
-        new_h = col1.text_input("새 핸들 추가 (예: raonikor)")
-        new_f = col2.number_input("현재 팔로워 수", min_value=0, step=100)
+        # 1. 신규 핸들 추가 섹션
+        with st.expander("➕ 새 핸들 추가하기", expanded=True):
+            col1, col2 = st.columns(2)
+            new_h = col1.text_input("새 핸들 (예: raonikor)")
+            new_f = col2.number_input("현재 팔로워 수", min_value=0, step=100)
 
-        if st.button("구글 시트에 저장"):
-            if new_h and new_h not in handle_list:
-                try:
-                    # [수정 부분] followers 정보까지 포함하여 새 행 생성
-                    new_row = pd.DataFrame([{"handle": new_h, "followers": new_f}])
-                    updated_df = pd.concat([df_handles, new_row], ignore_index=True)
-                    
-                    conn.update(worksheet="Sheet1", data=updated_df)
-                    
-                    st.success(f"@{new_h} (팔로워: {new_f:,}) 추가 완료!")
-                    st.balloons()
-                    st.cache_data.clear()
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"저장 중 오류 발생: {e}")
-        
+            if st.button("구글 시트에 신규 저장"):
+                if new_h:
+                    try:
+                        new_row = pd.DataFrame([{"handle": new_h, "followers": new_f}])
+                        updated_df = pd.concat([df_handles, new_row], ignore_index=True)
+                        conn.update(worksheet="Sheet1", data=updated_df)
+                        st.success(f"@{new_h} 추가 완료!")
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"저장 오류: {e}")
+
         st.divider()
-        st.write("### 현재 등록된 데이터")
-        st.dataframe(df_handles, use_container_width=True)
+
+        # 2. [핵심 추가] 기존 데이터 수정 및 삭제 섹션
+        st.subheader("📝 등록된 데이터 수정 (엑셀처럼 수정하세요)")
+        st.info("💡 표 안의 숫자를 더블클릭하여 수정한 후, 아래 '수정사항 저장' 버튼을 누르세요.")
+        
+        # 데이터 에디터 출력
+        edited_df = st.data_editor(
+            df_handles, 
+            use_container_width=True, 
+            num_rows="dynamic", # 행 삭제 및 추가 가능
+            key="data_editor"
+        )
+
+        if st.button("💾 수정사항 구글 시트에 최종 저장"):
+            try:
+                # 수정된 데이터프레임을 구글 시트에 통째로 덮어쓰기
+                conn.update(worksheet="Sheet1", data=edited_df)
+                st.success("구글 시트에 성공적으로 반영되었습니다!")
+                st.balloons()
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as e:
+                st.error(f"업데이트 중 오류 발생: {e}")
+                
     else:
         st.warning("관리자 비밀번호를 입력하세요.")
