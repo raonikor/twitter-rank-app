@@ -6,7 +6,7 @@ import plotly.express as px
 # 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵", layout="wide")
 
-# 2. CSS 스타일 (모바일 최적화 & 슬림 디자인)
+# 2. CSS 스타일
 st.markdown("""
     <style>
     .stApp { background-color: #0F1115; color: #FFFFFF; }
@@ -17,96 +17,49 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* [수정] 리더보드 리스트 스타일 - 슬림 버전 */
+    /* 리더보드 리스트 스타일 (슬림 버전) */
     .ranking-row { 
-        display: flex; 
-        align-items: center; 
-        justify-content: space-between; 
-        background-color: #16191E; 
-        border: 1px solid #2D3035; 
-        border-radius: 6px; 
-        padding: 8px 12px; /* 상하 패딩 축소 (12px -> 8px) */
-        margin-bottom: 6px; /* 마진 축소 */
-        transition: all 0.2s ease; 
+        display: flex; align-items: center; justify-content: space-between; 
+        background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
+        padding: 8px 12px; margin-bottom: 6px; transition: all 0.2s ease; 
     }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
-    /* [수정] 순위 숫자 크기 축소 */
     .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 25px; }
+    .rank-img { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 10px; object-fit: cover; }
     
-    /* [수정] 프로필 이미지 크기 축소 (45px -> 36px) */
-    .rank-img { 
-        width: 36px; 
-        height: 36px; 
-        border-radius: 50%; 
-        border: 2px solid #2D3035; 
-        margin-right: 10px; /* 간격 축소 */
-        object-fit: cover; 
-    }
+    /* 이름 및 핸들 */
+    .rank-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+    .rank-name { font-size: 14px; font-weight: 700; color: #FFFFFF; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+    .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; line-height: 1.2; }
     
-    /* 이름 및 핸들 영역 */
-    .rank-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; } /* overflow 추가: 긴 이름 잘림 방지 */
+    .rank-share { font-size: 13px; font-weight: 700; color: #10B981; min-width: 50px; text-align: right; margin-right: 10px; }
+    .rank-followers { font-size: 13px; font-weight: 600; color: #E5E7EB; text-align: right; min-width: 70px; }
     
-    /* [수정] 폰트 사이즈 축소 */
-    .rank-name { 
-        font-size: 14px; /* 16px -> 14px */
-        font-weight: 700; 
-        color: #FFFFFF; 
-        line-height: 1.2;
-        white-space: nowrap; /* 모바일에서 줄바꿈 방지 */
-        overflow: hidden;
-        text-overflow: ellipsis; /* 너무 길면 ... 처리 */
-        max-width: 150px; /* 이름 길이 제한 */
-    }
-    .rank-handle { 
-        font-size: 12px; /* 13px -> 12px */
-        font-weight: 400; 
-        color: #9CA3AF; 
-        line-height: 1.2; 
-    }
-    
-    /* [수정] 점유율(%) 스타일 - 간격 및 폰트 축소 */
-    .rank-share { 
-        font-size: 13px; /* 15px -> 13px */
-        font-weight: 700; 
-        color: #10B981; 
-        min-width: 50px; /* 최소 너비 축소 */
-        text-align: right; 
-        margin-right: 10px; /* 간격 축소 */
-    }
-
-    /* [수정] 팔로워 숫자 스타일 - 간격 및 폰트 축소 */
-    .rank-followers { 
-        font-size: 13px; /* 15px -> 13px */
-        font-weight: 600; 
-        color: #E5E7EB; 
-        text-align: right; 
-        min-width: 70px; /* 최소 너비 축소 */
-    }
-    
-    /* 카테고리 태그 - 모바일에서 공간 부족하면 숨기거나 작게 표시 */
-    .rank-category { 
-        font-size: 10px; 
-        color: #9CA3AF; 
-        background-color: #374151; 
-        padding: 2px 6px; 
-        border-radius: 8px; 
-        margin-right: 8px;
-        display: none; /* [선택] 모바일 공간 확보를 위해 일단 숨김 (필요하면 block으로 변경) */
-    }
-    /* 화면이 넓을 때(데스크탑)만 카테고리 보이기 */
-    @media (min-width: 640px) {
-        .rank-category { display: block; }
-        .rank-name { max-width: 300px; }
-    }
+    /* 카테고리 태그 (모바일 숨김 처리) */
+    .rank-category { font-size: 10px; color: #9CA3AF; background-color: #374151; padding: 2px 6px; border-radius: 8px; margin-right: 8px; display: none; }
+    @media (min-width: 640px) { .rank-category { display: block; } .rank-name { max-width: 300px; } }
     
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
 
-    /* 차트 인터랙션 */
-    .js-plotly-plot .main-svg { transition: filter 0.3s ease-in-out; }
-    .js-plotly-plot:hover .main-svg { filter: brightness(0.92); }
-    .js-plotly-plot:active { transform: scale(0.995); transition: transform 0.1s cubic-bezier(0, 0, 0.2, 1); }
+    /* [NEW] 차트 인터랙션 수정: 전체가 아닌 '개별 블록'에만 효과 적용 */
+    
+    /* 1. 기존의 전체 차트 필터 제거 (삭제됨) */
+    
+    /* 2. 개별 블록(Path)에 호버 효과 적용 */
+    /* g.shapelayer path는 트리맵의 각 사각형을 의미합니다 */
+    .js-plotly-plot .plotly .main-svg g.shapelayer path {
+        transition: filter 0.2s ease, stroke 0.2s ease; /* 부드러운 전환 */
+        cursor: pointer; /* 마우스 올리면 손가락 모양 */
+    }
+    
+    /* 3. 마우스가 올라간 블록만 밝게 처리 + 테두리 강조 */
+    .js-plotly-plot .plotly .main-svg g.shapelayer path:hover {
+        filter: brightness(1.2) !important; /* 밝기 1.2배 (강조) */
+        /* stroke: #10B981 !important; */ /* (선택사항) 테두리를 녹색으로 바꾸려면 주석 해제 */
+        opacity: 1 !important;
+    }
 
     /* 사이드바 메뉴 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
