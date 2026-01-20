@@ -1,3 +1,20 @@
+네, 아주 좋은 전략입니다!
+
+**`ttl="24h"` (24시간)**은 API 절약에는 최고지만, 만약 시트에서 중요한 내용을 수정했을 때 하루 종일 반영이 안 될 수도 있다는 단점이 있죠.
+
+반면 **`ttl="30m"` (30분)**으로 설정하면:
+
+1. **적절한 최신화:** 내가 아무것도 안 해도 **최대 30분 뒤에는 무조건** 최신 데이터가 반영됩니다.
+2. **안전장치:** 캐시가 리셋되어도 금방(30분 주기) 복구되므로 공백이 줄어듭니다.
+3. **API 안전:** 30분에 1번 호출이면 하루에 48번밖에 안 되므로, 구글 무료 한도(분당 60회 등)에 비하면 **아주 널널하고 안전**합니다.
+
+---
+
+### ⏱️ 30분 자동 갱신 + 수동 동기화 버튼이 적용된 최종 `app.py`
+
+`conn.read(ttl="30m")`으로 변경된 전체 코드입니다.
+
+```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -60,20 +77,19 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 로드 (API 최소화 핵심 로직)
+# 3. 데이터 로드 (30분 캐시 적용)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
     try:
-        # [핵심 변경] ttl="24h" -> 24시간 동안 캐시 유지 (즉, 버튼 안 누르면 API 호출 안 함)
-        df = conn.read(ttl="24h") 
+        # [핵심 변경] ttl="30m" -> 30분마다 한 번씩만 API 호출 (안전함)
+        df = conn.read(ttl="30m") 
         
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
             df['category'] = df['category'].fillna('미분류') if 'category' in df.columns else '미분류'
             df['handle'] = df['handle'].astype(str)
             
-            # 구글 시트에 name이 비어있으면 핸들로 채움
             if 'name' not in df.columns:
                 df['name'] = df['handle'] 
             else:
@@ -179,7 +195,7 @@ if not df.empty:
         with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
 else: st.info("데이터가 없습니다.")
 
-# 6. [NEW] API 절약형 관리자 대시보드
+# 6. API 절약형 관리자 대시보드
 if is_admin:
     st.divider()
     st.header("🛠️ Admin Dashboard")
@@ -188,13 +204,12 @@ if is_admin:
     col1, col2 = st.columns([1, 3])
     
     with col1:
-        # 버튼을 누르면 캐시를 날리고(clear) 앱을 다시 실행(rerun) -> 이때만 API 호출됨
+        # [핵심] 버튼을 누르면 캐시 삭제 -> 즉시 30분 타이머 리셋 및 최신 데이터 로드
         if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
             
     with col2:
-        st.write("👈 **시트 수정 후 이 버튼을 눌러야 반영됩니다.** (평소엔 API 호출 안 함)")
-    
-    # (선택사항) 구글 시트 링크를 알고 계시다면 아래 url에 넣으세요
-    # st.link_button("📂 구글 시트 열기", "https://docs.google.com/spreadsheets/...")
+        st.write("👈 **시트 수정 후 이 버튼을 눌러야 반영됩니다.** (자동 갱신 주기: 30분)")
+
+```
