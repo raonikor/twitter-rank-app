@@ -5,85 +5,82 @@ import numpy as np
 import plotly.express as px
 
 # 1. 페이지 설정
-st.set_page_config(page_title="Twitter Rank DB", layout="wide")
+st.set_page_config(page_title="Twitter Mindshare Dashboard", layout="wide")
 
-# 2. 구글 시트 연결 설정
+# 2. 구글 시트 연결
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 데이터 불러오기 함수
 def get_data():
-    return conn.read(ttl="10m") 
+    # 시트 로드 (캐시 설정으로 속도 향상)
+    return conn.read(ttl="5m")
 
-# 3. 데이터 로드
 df_handles = get_data()
-handle_list = df_handles['handle'].tolist() if not df_handles.empty else []
 
-# --- 관리자 비밀번호 ---
-ADMIN_PASSWORD = st.secrets["ADMIN_PW"]
+# 3. 사이드바 구성 (분류 필터링)
+with st.sidebar:
+    st.title("📂 카테고리 필터")
+    
+    # 카테고리 목록 정의 (시트에 있는 카테고리 자동 추출 + '전체보기' 추가)
+    categories = ["전체보기", "크립토", "정치계", "경제계", "연예/예술"]
+    selected_category = st.radio("분류를 선택하세요", categories)
+    
+    st.divider()
+    # 관리자 로그인 (사이드바 하단으로 이동 및 입력란 간소화)
+    st.subheader("🔑 시스템 관리")
+    pw = st.text_input("Admin Password", type="password", label_visibility="collapsed")
+    is_admin = (pw == st.secrets["ADMIN_PW"])
 
-# 탭 구성
-tab1, tab2 = st.tabs(["📊 대시보드", "🛠️ 관리자 설정"])
+# 4. 메인 화면 로직
+st.title(f"📊 Twitter Mindshare: {selected_category}")
 
-with tab1:
-    st.header("트위터 마인드쉐어 (실제 팔로워 기반)")
-    if not df_handles.empty and 'followers' in df_handles.columns:
-        # 가상 데이터 대신 구글 시트의 'followers' 데이터를 사용함
-        plot_data = df_handles.copy()
-        plot_data['채널'] = plot_data['handle'].apply(lambda x: f"@{x}")
-        
-        # 트리맵 시각화 (values에 실제 팔로워 숫자를 넣음)
-        fig = px.treemap(plot_data, path=['채널'], values='followers', color='followers', color_continuous_scale='Blues')
-        st.plotly_chart(fig, use_container_width=True)
+# 데이터 필터링 로직
+if selected_category == "전체보기":
+    display_df = df_handles
+else:
+    # 'category' 컬럼이 있는 경우에만 필터링
+    if 'category' in df_handles.columns:
+        display_df = df_handles[df_handles['category'] == selected_category]
     else:
-        st.info("데이터가 없거나 'followers' 컬럼이 생성되지 않았습니다. 관리자 탭에서 핸들을 추가해주세요.")
+        display_df = pd.DataFrame()
+        st.error("구글 시트에 'category' 헤더를 추가해주세요!")
 
-with tab2:
-    pw = st.sidebar.text_input("관리자 비번", type="password")
-    if pw == ADMIN_PASSWORD:
-        st.header("🛠️ 채널 및 팔로워 관리")
-        
-        # 1. 신규 핸들 추가 섹션
-        with st.expander("➕ 새 핸들 추가하기", expanded=True):
-            col1, col2 = st.columns(2)
-            new_h = col1.text_input("새 핸들 (예: raonikor)")
-            new_f = col2.number_input("현재 팔로워 수", min_value=0, step=100)
+# 차트 출력
+if not display_df.empty and 'followers' in display_df.columns:
+    # 트리맵 시각화
+    fig = px.treemap(
+        display_df, 
+        path=[px.Constant("전체") if selected_category == "전체보기" else 'category', 'handle'], 
+        values='followers',
+        color='followers',
+        color_continuous_scale='Blues',
+        title=f"{selected_category} 그룹 마인드쉐어 분석"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # 데이터 상세 표
+    st.dataframe(display_df[['handle', 'followers', 'category']], use_container_width=True)
+else:
+    st.warning(f"'{selected_category}' 카테고리에 등록된 데이터가 없습니다.")
 
-            if st.button("구글 시트에 신규 저장"):
-                if new_h:
-                    try:
-                        new_row = pd.DataFrame([{"handle": new_h, "followers": new_f}])
-                        updated_df = pd.concat([df_handles, new_row], ignore_index=True)
-                        conn.update(worksheet="Sheet1", data=updated_df)
-                        st.success(f"@{new_h} 추가 완료!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"저장 오류: {e}")
+# 5. 관리자 전용 화면 (로그인 시에만 아래에 나타남)
+if is_admin:
+    st.divider()
+    st.header("🛠️ 관리자 데이터 마스터")
+    
+    # 엑셀처럼 수정 가능한 에디터
+    st.info("💡 카테고리 칸에 '크립토', '정치계' 등을 입력하여 분류를 지정하세요.")
+    edited_df = st.data_editor(
+        df_handles, 
+        use_container_width=True, 
+        num_rows="dynamic",
+        key="admin_editor"
+    )
 
-        st.divider()
-
-        # 2. [핵심 추가] 기존 데이터 수정 및 삭제 섹션
-        st.subheader("📝 등록된 데이터 수정 (엑셀처럼 수정하세요)")
-        st.info("💡 표 안의 숫자를 더블클릭하여 수정한 후, 아래 '수정사항 저장' 버튼을 누르세요.")
-        
-        # 데이터 에디터 출력
-        edited_df = st.data_editor(
-            df_handles, 
-            use_container_width=True, 
-            num_rows="dynamic", # 행 삭제 및 추가 가능
-            key="data_editor"
-        )
-
-        if st.button("💾 수정사항 구글 시트에 최종 저장"):
-            try:
-                # 수정된 데이터프레임을 구글 시트에 통째로 덮어쓰기
-                conn.update(worksheet="Sheet1", data=edited_df)
-                st.success("구글 시트에 성공적으로 반영되었습니다!")
-                st.balloons()
-                st.cache_data.clear()
-                st.rerun()
-            except Exception as e:
-                st.error(f"업데이트 중 오류 발생: {e}")
-                
-    else:
-        st.warning("관리자 비밀번호를 입력하세요.")
+    if st.button("💾 모든 변경사항 구글 시트에 최종 저장"):
+        try:
+            conn.update(worksheet="Sheet1", data=edited_df)
+            st.success("데이터가 성공적으로 업데이트되었습니다!")
+            st.cache_data.clear()
+            st.rerun()
+        except Exception as e:
+            st.error(f"저장 중 오류 발생: {e}")
