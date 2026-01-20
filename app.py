@@ -6,7 +6,7 @@ import plotly.express as px
 # 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵", layout="wide")
 
-# 2. CSS 스타일
+# 2. CSS 스타일 (모바일 최적화 & 슬림 디자인)
 st.markdown("""
     <style>
     .stApp { background-color: #0F1115; color: #FFFFFF; }
@@ -17,30 +17,88 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* 리더보드 리스트 스타일 */
-    .ranking-row { display: flex; align-items: center; justify-content: space-between; background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 12px 20px; margin-bottom: 8px; transition: all 0.2s ease; }
+    /* [수정] 리더보드 리스트 스타일 - 슬림 버전 */
+    .ranking-row { 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        background-color: #16191E; 
+        border: 1px solid #2D3035; 
+        border-radius: 6px; 
+        padding: 8px 12px; /* 상하 패딩 축소 (12px -> 8px) */
+        margin-bottom: 6px; /* 마진 축소 */
+        transition: all 0.2s ease; 
+    }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
-    .rank-num { font-size: 18px; font-weight: bold; color: #10B981; width: 35px; }
-    .rank-img { width: 45px; height: 45px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 15px; object-fit: cover; }
+    /* [수정] 순위 숫자 크기 축소 */
+    .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 25px; }
     
-    /* 이름 및 핸들 */
-    .rank-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
-    .rank-name { font-size: 16px; font-weight: 700; color: #FFFFFF; line-height: 1.2; }
-    .rank-handle { font-size: 13px; font-weight: 400; color: #9CA3AF; line-height: 1.2; }
+    /* [수정] 프로필 이미지 크기 축소 (45px -> 36px) */
+    .rank-img { 
+        width: 36px; 
+        height: 36px; 
+        border-radius: 50%; 
+        border: 2px solid #2D3035; 
+        margin-right: 10px; /* 간격 축소 */
+        object-fit: cover; 
+    }
     
-    /* 점유율(%) 스타일 */
-    .rank-share { 
-        font-size: 15px; 
+    /* 이름 및 핸들 영역 */
+    .rank-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; } /* overflow 추가: 긴 이름 잘림 방지 */
+    
+    /* [수정] 폰트 사이즈 축소 */
+    .rank-name { 
+        font-size: 14px; /* 16px -> 14px */
         font-weight: 700; 
-        color: #10B981; /* 강조색 (Green) */
-        min-width: 70px; 
+        color: #FFFFFF; 
+        line-height: 1.2;
+        white-space: nowrap; /* 모바일에서 줄바꿈 방지 */
+        overflow: hidden;
+        text-overflow: ellipsis; /* 너무 길면 ... 처리 */
+        max-width: 150px; /* 이름 길이 제한 */
+    }
+    .rank-handle { 
+        font-size: 12px; /* 13px -> 12px */
+        font-weight: 400; 
+        color: #9CA3AF; 
+        line-height: 1.2; 
+    }
+    
+    /* [수정] 점유율(%) 스타일 - 간격 및 폰트 축소 */
+    .rank-share { 
+        font-size: 13px; /* 15px -> 13px */
+        font-weight: 700; 
+        color: #10B981; 
+        min-width: 50px; /* 최소 너비 축소 */
         text-align: right; 
-        margin-right: 20px;
+        margin-right: 10px; /* 간격 축소 */
     }
 
-    .rank-followers { font-size: 15px; font-weight: 600; color: #E5E7EB; text-align: right; min-width: 90px; }
-    .rank-category { font-size: 11px; color: #9CA3AF; background-color: #374151; padding: 4px 8px; border-radius: 12px; margin-right: 15px; }
+    /* [수정] 팔로워 숫자 스타일 - 간격 및 폰트 축소 */
+    .rank-followers { 
+        font-size: 13px; /* 15px -> 13px */
+        font-weight: 600; 
+        color: #E5E7EB; 
+        text-align: right; 
+        min-width: 70px; /* 최소 너비 축소 */
+    }
+    
+    /* 카테고리 태그 - 모바일에서 공간 부족하면 숨기거나 작게 표시 */
+    .rank-category { 
+        font-size: 10px; 
+        color: #9CA3AF; 
+        background-color: #374151; 
+        padding: 2px 6px; 
+        border-radius: 8px; 
+        margin-right: 8px;
+        display: none; /* [선택] 모바일 공간 확보를 위해 일단 숨김 (필요하면 block으로 변경) */
+    }
+    /* 화면이 넓을 때(데스크탑)만 카테고리 보이기 */
+    @media (min-width: 640px) {
+        .rank-category { display: block; }
+        .rank-name { max-width: 300px; }
+    }
     
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
@@ -60,14 +118,12 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 로드 (30분 캐시 적용)
+# 3. 데이터 로드 (30분 캐시)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
     try:
-        # [핵심 변경] ttl="30m" -> 30분마다 한 번씩만 API 호출 (안전함)
         df = conn.read(ttl="30m") 
-        
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
             df['category'] = df['category'].fillna('미분류') if 'category' in df.columns else '미분류'
@@ -187,7 +243,6 @@ if is_admin:
     col1, col2 = st.columns([1, 3])
     
     with col1:
-        # [핵심] 버튼을 누르면 캐시 삭제 -> 즉시 30분 타이머 리셋 및 최신 데이터 로드
         if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
