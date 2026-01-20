@@ -94,13 +94,20 @@ if not df.empty:
             display_df, 
             path=['category', 'handle'], 
             values='followers', 
-            color='followers', # 그라데이션 기준: 숫자
+            color='followers',
             
-            # [핵심 변경] 커스텀 컬러 스케일: Deep Navy -> Blue -> Neon Green
+            # [핵심 변경] 10단계 무지개 그라데이션 (보라 -> 빨강)
             color_continuous_scale=[
-                (0.0, '#312e81'), # 팔로워 적음: 짙은 인디고 (배경과 어우러짐)
-                (0.5, '#06b6d4'), # 중간: 밝은 시안(Cyan)
-                (1.0, '#10b981')  # 팔로워 많음: 시그니처 네온 그린 (강조)
+                (0.0, '#4c1d95'), # 1. Deep Violet (가장 낮음)
+                (0.1, '#5b21b6'), # 2. Violet
+                (0.2, '#3b82f6'), # 3. Blue
+                (0.3, '#0ea5e9'), # 4. Sky Blue
+                (0.4, '#06b6d4'), # 5. Cyan
+                (0.5, '#10b981'), # 6. Emerald
+                (0.6, '#84cc16'), # 7. Lime
+                (0.7, '#eab308'), # 8. Yellow
+                (0.8, '#f97316'), # 9. Orange
+                (1.0, '#ef4444')  # 10. Red (가장 높음)
             ],
             template="plotly_dark"
         )
