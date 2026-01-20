@@ -17,7 +17,7 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* 리더보드 리스트 스타일 (슬림 버전) */
+    /* 리더보드 리스트 스타일 */
     .ranking-row { 
         display: flex; align-items: center; justify-content: space-between; 
         background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
@@ -28,7 +28,6 @@ st.markdown("""
     .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 25px; }
     .rank-img { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 10px; object-fit: cover; }
     
-    /* 이름 및 핸들 */
     .rank-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
     .rank-name { font-size: 14px; font-weight: 700; color: #FFFFFF; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
     .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; line-height: 1.2; }
@@ -36,29 +35,18 @@ st.markdown("""
     .rank-share { font-size: 13px; font-weight: 700; color: #10B981; min-width: 50px; text-align: right; margin-right: 10px; }
     .rank-followers { font-size: 13px; font-weight: 600; color: #E5E7EB; text-align: right; min-width: 70px; }
     
-    /* 카테고리 태그 (모바일 숨김 처리) */
     .rank-category { font-size: 10px; color: #9CA3AF; background-color: #374151; padding: 2px 6px; border-radius: 8px; margin-right: 8px; display: none; }
     @media (min-width: 640px) { .rank-category { display: block; } .rank-name { max-width: 300px; } }
     
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
 
-    /* [NEW] 차트 인터랙션 수정: 전체가 아닌 '개별 블록'에만 효과 적용 */
-    
-    /* 1. 기존의 전체 차트 필터 제거 (삭제됨) */
-    
-    /* 2. 개별 블록(Path)에 호버 효과 적용 */
-    /* g.shapelayer path는 트리맵의 각 사각형을 의미합니다 */
+    /* 차트 인터랙션 (블록 개별 강조) */
     .js-plotly-plot .plotly .main-svg g.shapelayer path {
-        transition: filter 0.2s ease, stroke 0.2s ease; /* 부드러운 전환 */
-        cursor: pointer; /* 마우스 올리면 손가락 모양 */
+        transition: filter 0.2s ease; cursor: pointer;
     }
-    
-    /* 3. 마우스가 올라간 블록만 밝게 처리 + 테두리 강조 */
     .js-plotly-plot .plotly .main-svg g.shapelayer path:hover {
-        filter: brightness(1.2) !important; /* 밝기 1.2배 (강조) */
-        /* stroke: #10B981 !important; */ /* (선택사항) 테두리를 녹색으로 바꾸려면 주석 해제 */
-        opacity: 1 !important;
+        filter: brightness(1.2) !important; opacity: 1 !important;
     }
 
     /* 사이드바 메뉴 */
@@ -71,7 +59,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 로드 (30분 캐시)
+# 3. 데이터 로드
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
@@ -112,9 +100,8 @@ if not df.empty:
     if selected_category == "전체보기": display_df = df[df['followers'] > 0]
     else: display_df = df[(df['category'] == selected_category) & (df['followers'] > 0)]
 
-    # 상단 요약 카드 (3분할)
+    # 상단 요약 카드
     col1, col2, col3 = st.columns(3)
-    
     total_acc = len(display_df)
     total_fol = display_df['followers'].sum()
     top_one = display_df.loc[display_df['followers'].idxmax()] if not display_df.empty else None
@@ -128,13 +115,13 @@ if not df.empty:
 
     # 메인 차트 (트리맵)
     if not display_df.empty:
-        display_df['chart_label'] = display_df['name'] + "<br><span style='font-size:0.7em; font-weight:normal;'>@" + display_df['handle'] + "</span>"
-
+        # [핵심] 차트 설정 변경
         fig = px.treemap(
             display_df, 
-            path=['category', 'chart_label'], 
+            path=['category', 'handle'], # 경로는 handle(고유ID)로 설정하여 중복 방지
             values='followers', 
             color='followers',
+            custom_data=['name'], # [중요] 'name' 데이터를 커스텀 데이터로 넘김
             color_continuous_scale=[
                 (0.0, '#3F3C5C'), (0.1, '#4A477A'), (0.2, '#4A6FA5'), (0.3, '#5C8BAE'),
                 (0.4, '#5E9CA8'), (0.5, '#5F9E7F'), (0.6, '#859E5F'), (0.7, '#A89E5F'),
@@ -142,14 +129,20 @@ if not df.empty:
             ],
             template="plotly_dark"
         )
+        
         fig.update_traces(
-            texttemplate='<b>%{label}</b><br><b style="font-size:1.2em">%{value:,.0f}</b><br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
+            # [화면 표시] %{customdata[0]} = 이름. (핸들은 표시 안 함)
+            texttemplate='<b>%{customdata[0]}</b><br><b style="font-size:1.2em">%{value:,.0f}</b><br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
+            
             textfont=dict(size=20, family="sans-serif", color="white"),
             textposition="middle center",
             marker=dict(line=dict(width=6, color='#0F1115')), 
             root_color="#16191E",
-            hovertemplate='<b>%{label}</b><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
+            
+            # [마우스 호버] 여기서 이름과 @핸들(%{label})을 같이 보여줌
+            hovertemplate='<b>%{customdata[0]}</b><br><span style="color:#9CA3AF">@%{label}</span><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
         )
+        
         fig.update_layout(
             margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=600, font=dict(family="sans-serif"),
             hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1),
@@ -187,18 +180,16 @@ if not df.empty:
         with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
 else: st.info("데이터가 없습니다.")
 
-# 6. API 절약형 관리자 대시보드
+# 6. 관리자 대시보드
 if is_admin:
     st.divider()
     st.header("🛠️ Admin Dashboard")
     st.info("데이터 관리는 구글 스프레드시트에서 직접 수행하세요.")
     
     col1, col2 = st.columns([1, 3])
-    
     with col1:
         if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
-            
     with col2:
         st.write("👈 **시트 수정 후 이 버튼을 눌러야 반영됩니다.** (자동 갱신 주기: 30분)")
