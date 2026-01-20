@@ -6,7 +6,7 @@ import plotly.express as px
 # 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵", layout="wide")
 
-# 2. CSS 스타일 (타일형 디자인 + 인터랙션 + 사이드바 + 폰트)
+# 2. CSS 스타일
 st.markdown("""
     <style>
     .stApp { background-color: #0F1115; color: #FFFFFF; }
@@ -24,12 +24,22 @@ st.markdown("""
     .rank-num { font-size: 18px; font-weight: bold; color: #10B981; width: 35px; }
     .rank-img { width: 45px; height: 45px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 15px; object-fit: cover; }
     
-    /* 이름 및 핸들 영역 스타일 */
+    /* 이름 및 핸들 */
     .rank-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
     .rank-name { font-size: 16px; font-weight: 700; color: #FFFFFF; line-height: 1.2; }
     .rank-handle { font-size: 13px; font-weight: 400; color: #9CA3AF; line-height: 1.2; }
     
-    .rank-followers { font-size: 15px; font-weight: 600; color: #E5E7EB; text-align: right; min-width: 100px; }
+    /* [NEW] 점유율(%) 스타일 */
+    .rank-share { 
+        font-size: 15px; 
+        font-weight: 700; 
+        color: #10B981; /* 강조색 (Green) */
+        min-width: 70px; 
+        text-align: right; 
+        margin-right: 20px;
+    }
+
+    .rank-followers { font-size: 15px; font-weight: 600; color: #E5E7EB; text-align: right; min-width: 90px; }
     .rank-category { font-size: 11px; color: #9CA3AF; background-color: #374151; padding: 4px 8px; border-radius: 12px; margin-right: 15px; }
     
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
@@ -60,11 +70,10 @@ def get_data():
             df['category'] = df['category'].fillna('미분류') if 'category' in df.columns else '미분류'
             df['handle'] = df['handle'].astype(str)
             
-            # [핵심] 'name' 컬럼이 없으면 자동으로 생성 (핸들로 채움)
             if 'name' not in df.columns:
                 df['name'] = df['handle'] 
             else:
-                df['name'] = df['name'].fillna(df['handle']) # 비어있으면 핸들로 채움
+                df['name'] = df['name'].fillna(df['handle'])
                 
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category'])
@@ -95,7 +104,7 @@ if not df.empty:
     total_acc = len(display_df)
     total_fol = display_df['followers'].sum()
     top_one = display_df.loc[display_df['followers'].idxmax()] if not display_df.empty else None
-    top_one_text = f"{top_one['name']}" if top_one is not None else "-" # 이름으로 표시
+    top_one_text = f"{top_one['name']}" if top_one is not None else "-"
 
     with col1: st.markdown(f'<div class="metric-card"><div class="metric-label">전체 계정</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
     with col2: st.markdown(f'<div class="metric-card"><div class="metric-label">총 팔로워</div><div class="metric-value">{total_fol:,.0f}</div></div>', unsafe_allow_html=True)
@@ -105,12 +114,12 @@ if not df.empty:
 
     # 메인 차트 (트리맵)
     if not display_df.empty:
-        # [핵심] 차트 라벨을 위해 'Label' 컬럼 생성 (이름 + 줄바꿈 + @핸들)
+        # 차트 라벨
         display_df['chart_label'] = display_df['name'] + "<br><span style='font-size:0.7em; font-weight:normal;'>@" + display_df['handle'] + "</span>"
 
         fig = px.treemap(
             display_df, 
-            path=['category', 'chart_label'], # 핸들 대신 라벨 사용
+            path=['category', 'chart_label'], 
             values='followers', 
             color='followers',
             color_continuous_scale=[
@@ -121,13 +130,11 @@ if not df.empty:
             template="plotly_dark"
         )
         fig.update_traces(
-            # 라벨 포맷: 이름(@핸들) / 팔로워수 / 점유율
             texttemplate='<b>%{label}</b><br><b style="font-size:1.2em">%{value:,.0f}</b><br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
             textfont=dict(size=20, family="sans-serif", color="white"),
             textposition="middle center",
             marker=dict(line=dict(width=6, color='#0F1115')), 
             root_color="#16191E",
-            # 호버 정보 커스텀
             hovertemplate='<b>%{label}</b><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
         )
         fig.update_layout(
@@ -142,13 +149,18 @@ if not df.empty:
         st.subheader("🏆 팔로워 순위 (Leaderboard)")
         
         ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
+        # [NEW] 현재 화면에 보이는 전체 팔로워 합계 계산
+        view_total = ranking_df['followers'].sum()
+        
         list_html = ""
         for index, row in ranking_df.iterrows():
             rank = index + 1
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
             
-            # [핵심] 리더보드 레이아웃: 이름 아래에 핸들이 작게 들어감
+            # [NEW] 점유율(Share) 계산
+            share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
+            
             list_html += f"""
             <div class="ranking-row">
                 <div class="rank-num">{medal}</div>
@@ -158,13 +170,14 @@ if not df.empty:
                     <div class="rank-handle">@{row['handle']}</div>
                 </div>
                 <div class="rank-category">{row['category']}</div>
+                <div class="rank-share">{share_pct:.1f}%</div>
                 <div class="rank-followers">{int(row['followers']):,}</div>
             </div>
             """
         with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
 else: st.info("데이터가 없습니다.")
 
-# 6. 관리자 에디터 (이름 입력 필드 추가)
+# 6. 관리자 에디터
 if is_admin:
     st.divider()
     st.header("🛠️ Admin Dashboard")
@@ -176,7 +189,7 @@ if is_admin:
             col_a, col_b, col_c = st.columns([1, 1, 1])
             with col_a:
                 new_handle = st.text_input("핸들 (ID)", placeholder="예: elonmusk")
-                new_name = st.text_input("표시 이름 (Name)", placeholder="예: Elon Musk") # [NEW] 이름 입력
+                new_name = st.text_input("표시 이름 (Name)", placeholder="예: Elon Musk")
             with col_b:
                 new_followers = st.number_input("팔로워 수", min_value=0, step=100)
             with col_c:
@@ -187,7 +200,7 @@ if is_admin:
             if st.form_submit_button("💾 추가하기", type="primary"):
                 final_cat = new_category_input if new_category_select == "직접 입력" else new_category_select
                 clean_handle = new_handle.replace("@", "").strip()
-                final_name = new_name if new_name else clean_handle # 이름 안쓰면 핸들로 대체
+                final_name = new_name if new_name else clean_handle
                 
                 if clean_handle and final_cat:
                     new_data = pd.DataFrame([{'handle': clean_handle, 'name': final_name, 'followers': new_followers, 'category': final_cat}])
@@ -208,17 +221,16 @@ if is_admin:
             use_container_width=True,
             num_rows="dynamic",
             column_config={
-                "name": st.column_config.TextColumn("표시 이름 (Name)", required=True), # [NEW] 이름 컬럼
+                "name": st.column_config.TextColumn("표시 이름 (Name)", required=True),
                 "handle": st.column_config.TextColumn("핸들 (@ID)", required=True),
                 "followers": st.column_config.NumberColumn("팔로워", format="%d"),
                 "category": st.column_config.SelectboxColumn("카테고리", options=unique_cats, required=True),
-                "chart_label": None # 차트용 임시 컬럼은 숨김
+                "chart_label": None
             },
             key="admin_editor"
         )
         if st.button("💾 저장하기", type="primary"):
             try:
-                # 저장할 때는 chart_label 같은 임시 컬럼 제외
                 save_df = edited_df[['handle', 'name', 'followers', 'category']]
                 conn.update(worksheet="Sheet1", data=save_df)
                 st.success("저장 완료!")
