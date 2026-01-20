@@ -17,7 +17,7 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* 리더보드 리스트 스타일 (원본) */
+    /* 리더보드 리스트 스타일 */
     .ranking-row { display: flex; align-items: center; justify-content: space-between; background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 10px 20px; margin-bottom: 8px; transition: all 0.2s ease; }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
@@ -35,28 +35,13 @@ st.markdown("""
     .js-plotly-plot:hover .main-svg { filter: brightness(0.92); }
     .js-plotly-plot:active { transform: scale(0.995); transition: transform 0.1s cubic-bezier(0, 0, 0.2, 1); }
 
-    /* [NEW] 사이드바 라디오 버튼 스타일링 */
-    /* 사이드바 내의 라디오 버튼 각각의 항목(label)을 타겟팅 */
+    /* 사이드바 라디오 버튼 스타일링 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
-        background-color: #16191E; /* 리더보드 기본 배경색 */
-        border: 1px solid #2D3035; /* 리더보드 기본 테두리 */
-        border-radius: 6px;        /* 둥근 모서리 */
-        padding: 12px 15px !important; /* 내부 여백 */
-        margin-bottom: 8px;        /* 항목 간 간격 */
-        transition: all 0.2s ease; /* 부드러운 전환 애니메이션 */
-        color: #E5E7EB !important; /* 글자색 */
+        background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 12px 15px !important; margin-bottom: 8px; transition: all 0.2s ease; color: #E5E7EB !important;
     }
-
-    /* 마우스 호버 효과 (리더보드와 동일) */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover {
-        border-color: #10B981;    /* Bridge Green 네온 테두리 */
-        background-color: #1C1F26; /* 약간 밝은 배경색 */
-        transform: translateX(5px); /* 오른쪽으로 살짝 이동 */
-        color: #FFFFFF !important; /* 호버 시 글자색 흰색으로 강조 */
+        border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); color: #FFFFFF !important;
     }
-
-    /* 선택된 항목 강조 (선택사항) */
-    /* Streamlit 구조상 선택된 항목만 완벽하게 타겟팅하기 어렵지만, 기본적으로 라디오 버튼 색상이 바뀝니다. */
     </style>
     """, unsafe_allow_html=True)
 
@@ -77,10 +62,7 @@ with st.sidebar:
     st.markdown("### **MINDSHARE**")
     available_cats = ["전체보기"]
     if not df.empty: available_cats.extend(sorted(df['category'].unique().tolist()))
-    
-    # 라디오 버튼 (CSS로 스타일이 입혀짐)
     selected_category = st.radio(" ", available_cats, label_visibility="collapsed")
-    
     st.divider()
     for _ in range(15): st.write("")
     with st.expander("⚙️ Admin", expanded=False):
@@ -106,12 +88,17 @@ if not df.empty:
     with col4: st.markdown(f'<div class="metric-card"><div class="metric-label">기간</div><div class="metric-value">7일</div></div>', unsafe_allow_html=True)
     st.write("")
 
-    # 메인 차트 (트리맵)
+    # 메인 차트 (트리맵) - 그라데이션 적용
     if not display_df.empty:
-        bridge_colors = ['#D97706', '#2563EB', '#059669', '#DC2626', '#7C3AED', '#DB2777']
         fig = px.treemap(
-            display_df, path=['category', 'handle'], values='followers', color='category',
-            color_discrete_sequence=bridge_colors, template="plotly_dark"
+            display_df, 
+            path=['category', 'handle'], 
+            values='followers', 
+            # [핵심 변경] 색상 기준을 카테고리에서 팔로워 수로 변경
+            color='followers', 
+            # [핵심 변경] 연속적인 컬러 스케일(그라데이션) 적용. 다크테마에 어울리는 Tealgrn 사용
+            color_continuous_scale=px.colors.sequential.Tealgrn,
+            template="plotly_dark"
         )
         
         fig.update_traces(
@@ -125,7 +112,9 @@ if not df.empty:
         
         fig.update_layout(
             margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=600, font=dict(family="sans-serif"),
-            hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1)
+            hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1),
+            # 컬러바(범례) 숨기기 (깔끔함을 위해 선택사항)
+            coloraxis_showscale=False 
         )
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
