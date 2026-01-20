@@ -6,7 +6,7 @@ import plotly.express as px
 # 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵", layout="wide")
 
-# 2. CSS 스타일 (Bridge 스타일 + 리더보드 + 프로필 이미지)
+# 2. CSS 스타일 (Bridge 스타일 + 인터랙션 효과 추가)
 st.markdown("""
     <style>
     .stApp { background-color: #0F1115; color: #FFFFFF; }
@@ -29,6 +29,21 @@ st.markdown("""
     
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
+
+    /* [NEW] 차트 인터랙션 효과 추가 */
+    /* 1. 마우스 호버 시 부드러운 전환 효과 설정 */
+    .js-plotly-plot .main-svg {
+        transition: filter 0.3s ease-in-out;
+    }
+    /* 2. 마우스가 차트 위에 올라갔을 때 전체적으로 살짝 어두워짐 (흐려지는 느낌) */
+    .js-plotly-plot:hover .main-svg {
+        filter: brightness(0.92); 
+    }
+    /* 3. 차트 영역 클릭 시(active) 미세하게 작아지며 눌리는 느낌 */
+    .js-plotly-plot:active {
+        transform: scale(0.995);
+        transition: transform 0.1s cubic-bezier(0, 0, 0.2, 1);
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -83,14 +98,8 @@ if not df.empty:
             color_discrete_sequence=bridge_colors, template="plotly_dark"
         )
         
-        # [핵심 변경] 텍스트 템플릿 수정 (점유율 퍼센트 추가)
         fig.update_traces(
-            # texttemplate을 사용하여 3줄로 표시:
-            # 1. 굵은 핸들명
-            # 2. 팔로워 숫자
-            # 3. 전체 대비 점유율 (소수점 1자리)
             texttemplate='<b>%{label}</b><br>%{value:,.0f}<br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
-            
             textfont=dict(size=24, family="sans-serif", color="white"),
             textposition="middle center",
             marker=dict(line=dict(width=3, color='#0F1115')), 
@@ -102,7 +111,8 @@ if not df.empty:
             margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=600, font=dict(family="sans-serif"),
             hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1)
         )
-        st.plotly_chart(fig, use_container_width=True)
+        # config 추가: 차트 상단 도구 모음 숨겨서 깔끔하게 만들기
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
         # 리더보드
         st.write("")
@@ -116,7 +126,6 @@ if not df.empty:
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
             
-            # 리더보드에도 퍼센트 정보 추가? (선택사항 - 현재는 깔끔함을 위해 팔로워만 표시)
             list_html += f"""
             <div class="ranking-row">
                 <div class="rank-num">{medal}</div>
