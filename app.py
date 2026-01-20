@@ -19,7 +19,7 @@ df_handles = get_data()
 handle_list = df_handles['handle'].tolist() if not df_handles.empty else []
 
 # --- 관리자 비밀번호 (Secrets 권장) ---
-ADMIN_PASSWORD = "admin123" 
+ADMIN_PASSWORD = st.secrets["ADMIN_PW"]
 
 # 탭 구성
 tab1, tab2 = st.tabs(["📊 대시보드", "🛠️ 관리자 설정"])
@@ -77,4 +77,5 @@ with tab2:
         st.dataframe(df_handles)
     else:
         st.warning("관리자 비밀번호를 입력하세요.")
+
 
