@@ -45,19 +45,36 @@ with tab2:
         
         # 신규 핸들 추가
         new_h = st.text_input("새 핸들 추가")
+# [수정된 저장 로직]
         if st.button("구글 시트에 저장"):
             if new_h and new_h not in handle_list:
-                # 새 데이터 추가
-                new_row = pd.DataFrame([{"handle": new_h}])
-                updated_df = pd.concat([df_handles, new_row], ignore_index=True)
-                
-                # 구글 시트 업데이트
-                conn.update(data=updated_df)
-                st.success(f"@{new_h}가 구글 시트에 저장되었습니다!")
-                st.rerun()
+                try:
+                    # 1. 새 행 데이터 만들기
+                    new_row = pd.DataFrame([{"handle": new_h}])
+                    
+                    # 2. 기존 데이터와 합치기
+                    updated_df = pd.concat([df_handles, new_row], ignore_index=True)
+                    
+                    # 3. [핵심 수정] 명시적으로 시트 이름을 지정하여 업데이트 시도
+                    # 만약 시트 탭 이름이 '시트1'이 아니라면 아래 "Sheet1"을 실제 이름으로 바꾸세요.
+                    conn.update(worksheet="Sheet1", data=updated_df)
+                    
+                    st.success(f"@{new_h} 추가 완료! 잠시 후 반영됩니다.")
+                    st.balloons() # 성공 축하 풍선 효과
+                    
+                    # 데이터 새로고침을 위해 캐시 삭제 후 재실행
+                    st.cache_data.clear()
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"저장 중 기술적 오류가 발생했습니다.")
+                    st.info("💡 해결방법: 구글 시트 하단 탭 이름이 'Sheet1'인지 확인해주세요. 아니라면 코드를 그 이름에 맞춰야 합니다.")
+                    # 상세 에러 로그 출력 (디버깅용)
+                    st.write(f"상세 에러: {e}")
         
         st.divider()
         st.write("### 현재 등록된 리스트 (구글 시트 데이터)")
         st.dataframe(df_handles)
     else:
         st.warning("관리자 비밀번호를 입력하세요.")
+
