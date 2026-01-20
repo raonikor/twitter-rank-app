@@ -1,10 +1,3 @@
-네, 상단 요약 카드에서 **'기간'**을 제거하고, 남은 3개의 카드(전체 계정, 총 팔로워, 최고 영향력)가 화면을 꽉 채우도록 수정했습니다.
-
-이제 상단 영역이 3등분되어 더욱 시원하게 보일 것입니다.
-
-### ✂️ 기간 카드가 제거된 최종 `app.py`
-
-```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -242,5 +235,3 @@ if is_admin:
                 st.cache_data.clear()
                 st.rerun()
             except Exception as e: st.error(f"오류: {e}")
-
-```
