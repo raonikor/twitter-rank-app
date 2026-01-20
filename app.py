@@ -88,16 +88,20 @@ if not df.empty:
     with col4: st.markdown(f'<div class="metric-card"><div class="metric-label">기간</div><div class="metric-value">7일</div></div>', unsafe_allow_html=True)
     st.write("")
 
-    # 메인 차트 (트리맵) - 그라데이션 적용
+    # 메인 차트 (트리맵)
     if not display_df.empty:
         fig = px.treemap(
             display_df, 
             path=['category', 'handle'], 
             values='followers', 
-            # [핵심 변경] 색상 기준을 카테고리에서 팔로워 수로 변경
-            color='followers', 
-            # [핵심 변경] 연속적인 컬러 스케일(그라데이션) 적용. 다크테마에 어울리는 Tealgrn 사용
-            color_continuous_scale=px.colors.sequential.Tealgrn,
+            color='followers', # 그라데이션 기준: 숫자
+            
+            # [핵심 변경] 커스텀 컬러 스케일: Deep Navy -> Blue -> Neon Green
+            color_continuous_scale=[
+                (0.0, '#312e81'), # 팔로워 적음: 짙은 인디고 (배경과 어우러짐)
+                (0.5, '#06b6d4'), # 중간: 밝은 시안(Cyan)
+                (1.0, '#10b981')  # 팔로워 많음: 시그니처 네온 그린 (강조)
+            ],
             template="plotly_dark"
         )
         
@@ -113,7 +117,6 @@ if not df.empty:
         fig.update_layout(
             margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=600, font=dict(family="sans-serif"),
             hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1),
-            # 컬러바(범례) 숨기기 (깔끔함을 위해 선택사항)
             coloraxis_showscale=False 
         )
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
