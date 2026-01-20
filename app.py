@@ -49,7 +49,7 @@ st.markdown("""
 conn = st.connection("gsheets", type=GSheetsConnection)
 def get_data():
     try:
-        df = conn.read(ttl="1m")
+        df = conn.read(ttl="10m")
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
             df['category'] = df['category'].fillna('미분류') if 'category' in df.columns else '미분류'
@@ -156,3 +156,4 @@ if is_admin:
     if st.button("Save", type="primary"):
         try: conn.update(worksheet="Sheet1", data=edited_df); st.success("Updated!"); st.cache_data.clear(); st.rerun()
         except Exception as e: st.error(f"Error: {e}")
+
