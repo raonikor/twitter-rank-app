@@ -96,18 +96,18 @@ if not df.empty:
             values='followers', 
             color='followers',
             
-            # [핵심 변경] 10단계 무지개 그라데이션 (보라 -> 빨강)
+            # [핵심 변경] 10단계 저채도(Muted) 그라데이션
             color_continuous_scale=[
-                (0.0, '#4c1d95'), # 1. Deep Violet (가장 낮음)
-                (0.1, '#5b21b6'), # 2. Violet
-                (0.2, '#3b82f6'), # 3. Blue
-                (0.3, '#0ea5e9'), # 4. Sky Blue
-                (0.4, '#06b6d4'), # 5. Cyan
-                (0.5, '#10b981'), # 6. Emerald
-                (0.6, '#84cc16'), # 7. Lime
-                (0.7, '#eab308'), # 8. Yellow
-                (0.8, '#f97316'), # 9. Orange
-                (1.0, '#ef4444')  # 10. Red (가장 높음)
+                (0.0, '#3F3C5C'), # 1. Muted Deep Indigo
+                (0.1, '#4A477A'), # 2. Muted Violet
+                (0.2, '#4A6FA5'), # 3. Muted Blue
+                (0.3, '#5C8BAE'), # 4. Muted Sky Blue
+                (0.4, '#5E9CA8'), # 5. Muted Cyan
+                (0.5, '#5F9E7F'), # 6. Muted Emerald
+                (0.6, '#859E5F'), # 7. Muted Lime
+                (0.7, '#A89E5F'), # 8. Muted Yellow
+                (0.8, '#AE815C'), # 9. Muted Orange
+                (1.0, '#AE5C5C')  # 10. Muted Red (가장 높음)
             ],
             template="plotly_dark"
         )
