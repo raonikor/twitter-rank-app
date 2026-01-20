@@ -6,18 +6,18 @@ import plotly.express as px
 # 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵", layout="wide")
 
-# 2. CSS 스타일 (Bridge 스타일 + 인터랙션 + 사이드바 메뉴)
+# 2. CSS 스타일
 st.markdown("""
     <style>
     .stApp { background-color: #0F1115; color: #FFFFFF; }
     [data-testid="stSidebar"] { background-color: #16191E; border-right: 1px solid #2D3035; }
     
-    /* 상단 요약 카드 */
+    /* 카드 디자인 */
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* 리더보드 리스트 스타일 */
+    /* 리스트 스타일 */
     .ranking-row { display: flex; align-items: center; justify-content: space-between; background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 10px 20px; margin-bottom: 8px; transition: all 0.2s ease; }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
@@ -30,12 +30,12 @@ st.markdown("""
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
 
-    /* 차트 인터랙션 효과 */
+    /* 차트 인터랙션 */
     .js-plotly-plot .main-svg { transition: filter 0.3s ease-in-out; }
     .js-plotly-plot:hover .main-svg { filter: brightness(0.92); }
     .js-plotly-plot:active { transform: scale(0.995); transition: transform 0.1s cubic-bezier(0, 0, 0.2, 1); }
 
-    /* 사이드바 라디오 버튼 스타일링 */
+    /* 사이드바 메뉴 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
         background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 12px 15px !important; margin-bottom: 8px; transition: all 0.2s ease; color: #E5E7EB !important;
     }
@@ -95,19 +95,11 @@ if not df.empty:
             path=['category', 'handle'], 
             values='followers', 
             color='followers',
-            
-            # [핵심 변경] 10단계 저채도(Muted) 그라데이션
+            # 10단계 저채도(Muted) 그라데이션
             color_continuous_scale=[
-                (0.0, '#3F3C5C'), # 1. Muted Deep Indigo
-                (0.1, '#4A477A'), # 2. Muted Violet
-                (0.2, '#4A6FA5'), # 3. Muted Blue
-                (0.3, '#5C8BAE'), # 4. Muted Sky Blue
-                (0.4, '#5E9CA8'), # 5. Muted Cyan
-                (0.5, '#5F9E7F'), # 6. Muted Emerald
-                (0.6, '#859E5F'), # 7. Muted Lime
-                (0.7, '#A89E5F'), # 8. Muted Yellow
-                (0.8, '#AE815C'), # 9. Muted Orange
-                (1.0, '#AE5C5C')  # 10. Muted Red (가장 높음)
+                (0.0, '#3F3C5C'), (0.1, '#4A477A'), (0.2, '#4A6FA5'), (0.3, '#5C8BAE'),
+                (0.4, '#5E9CA8'), (0.5, '#5F9E7F'), (0.6, '#859E5F'), (0.7, '#A89E5F'),
+                (0.8, '#AE815C'), (1.0, '#AE5C5C')
             ],
             template="plotly_dark"
         )
@@ -116,7 +108,11 @@ if not df.empty:
             texttemplate='<b>%{label}</b><br>%{value:,.0f}<br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
             textfont=dict(size=24, family="sans-serif", color="white"),
             textposition="middle center",
-            marker=dict(line=dict(width=3, color='#0F1115')), 
+            
+            # [핵심 변경] 테두리 두께(width)를 6으로 늘려 '카드'처럼 보이게 함
+            # 색상(#0F1115)은 배경색과 동일하게 설정하여 틈새 효과
+            marker=dict(line=dict(width=6, color='#0F1115')), 
+            
             root_color="#16191E",
             hovertemplate='<b>%{label}</b><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
         )
