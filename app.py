@@ -1,90 +1,63 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import os
 
-# 1. 페이지 설정 및 다크 테마
-st.set_page_config(page_title="Twitter Mindshare Admin", layout="wide")
+# 1. 페이지 설정
+st.set_page_config(page_title="Twitter Rank DB", layout="wide")
 
-# 핸들 목록을 저장할 파일 이름
-DB_FILE = "handles.txt"
-ADMIN_PASSWORD = "admin123"
+# 2. 구글 시트 연결 설정
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 2. 데이터 저장/불러오기 함수
-def load_handles():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
-            return [line.strip() for line in f.readlines() if line.strip()]
-    return ["elonmusk", "nasa"] # 기본값
+# 데이터 불러오기 함수
+def get_data():
+    return conn.read(ttl="10m") # 10분마다 새로고침
 
-def save_handles(handles):
-    with open(DB_FILE, "w") as f:
-        for h in handles:
-            f.write(f"{h}\n")
+# 3. 데이터 로드
+df_handles = get_data()
+handle_list = df_handles['handle'].tolist() if not df_handles.empty else []
 
-# 세션 상태 초기화
-if 'handle_list' not in st.session_state:
-    st.session_state.handle_list = load_handles()
+# --- 관리자 비밀번호 (Secrets 권장) ---
+ADMIN_PASSWORD = "admin123" 
 
-# 3. 사이드바 - 관리자 인증
-with st.sidebar:
-    st.title("🔐 관리 시스템")
-    pw = st.text_input("관리자 비밀번호", type="password")
-    is_admin = (pw == ADMIN_PASSWORD)
-    
-    if is_admin:
-        st.success("관리자 모드 활성화")
-    elif pw:
-        st.error("비밀번호 불일치")
-
-# 4. 메인 화면 구성
-tab1, tab2 = st.tabs(["📊 실시간 마인드쉐어", "🛠️ 핸들 관리 도구"])
+# 탭 구성
+tab1, tab2 = st.tabs(["📊 대시보드", "🛠️ 관리자 설정"])
 
 with tab1:
-    st.header("트위터 채널 영향력 분석")
-    
-    if not st.session_state.handle_list:
-        st.info("등록된 핸들이 없습니다. 관리자 도구에서 추가해주세요.")
-    else:
-        # 가상 데이터 생성 (점수 분포 최적화)
-        data = pd.DataFrame({
-            "채널명": [f"@{u}" for u in st.session_state.handle_list],
-            "마인드쉐어": np.random.randint(5000, 100000, size=len(st.session_state.handle_list))
-        }).sort_values("마인드쉐어", ascending=False)
-        
-        # 트리맵 시각화
-        fig = px.treemap(data, path=['채널명'], values='마인드쉐어', 
-                         color='마인드쉐어', color_continuous_scale='Greens')
-        fig.update_layout(margin=dict(t=30, l=0, r=0, b=0))
+    st.header("트위터 마인드쉐어")
+    if handle_list:
+        # 가상 데이터 생성
+        plot_data = pd.DataFrame({
+            "채널": [f"@{h}" for h in handle_list],
+            "점수": np.random.randint(1000, 50000, size=len(handle_list))
+        })
+        fig = px.treemap(plot_data, path=['채널'], values='점수', color='점수')
         st.plotly_chart(fig, width='stretch')
-        
-        # 랭킹 테이블
-        st.dataframe(data, width='stretch')
+    else:
+        st.info("관리자 탭에서 핸들을 추가해주세요.")
 
 with tab2:
-    if is_admin:
-        st.header("🛠️ 관리자 전용 설정")
+    # 관리자 로그인 체크
+    pw = st.sidebar.text_input("관리자 비번", type="password")
+    if pw == ADMIN_PASSWORD:
+        st.header("🛠️ 구글 시트 핸들 관리")
         
-        # 핸들 추가
-        new_h = st.text_input("추가할 트위터 ID (예: vitalikbuterin)")
-        if st.button("목록에 추가"):
-            if new_h and new_h not in st.session_state.handle_list:
-                st.session_state.handle_list.append(new_h.strip())
-                save_handles(st.session_state.handle_list) # 파일 저장
-                st.success(f"@{new_h} 등록 완료")
-                st.rerun() # 화면 갱신
+        # 신규 핸들 추가
+        new_h = st.text_input("새 핸들 추가")
+        if st.button("구글 시트에 저장"):
+            if new_h and new_h not in handle_list:
+                # 새 데이터 추가
+                new_row = pd.DataFrame([{"handle": new_h}])
+                updated_df = pd.concat([df_handles, new_row], ignore_index=True)
+                
+                # 구글 시트 업데이트
+                conn.update(data=updated_df)
+                st.success(f"@{new_h}가 구글 시트에 저장되었습니다!")
+                st.rerun()
         
         st.divider()
-        
-        # 핸들 삭제
-        st.subheader("현재 등록된 채널")
-        for h in st.session_state.handle_list:
-            c1, c2 = st.columns([3, 1])
-            c1.write(f"**@{h}**")
-            if c2.button("삭제", key=f"del_{h}"):
-                st.session_state.handle_list.remove(h)
-                save_handles(st.session_state.handle_list) # 파일 저장
-                st.rerun()
+        st.write("### 현재 등록된 리스트 (구글 시트 데이터)")
+        st.dataframe(df_handles)
     else:
-        st.warning("이 탭은 관리자만 접근 가능합니다. 사이드바에서 로그인하세요.")
+        st.warning("관리자 비밀번호를 입력하세요.")
