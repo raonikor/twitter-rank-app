@@ -2,15 +2,14 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 
-# 1. 페이지 설정: Bridge 스타일 레이아웃
-st.set_page_config(page_title="Community Mindshare", layout="wide")
+# 1. 페이지 설정
+st.set_page_config(page_title="Korean Community Mindshare", layout="wide")
 
-# 2. [디자인 핵심] Bridge 스타일 커스텀 CSS
+# 2. [디자인 핵심] Bridge 스타일 + 리더보드 리스트 CSS
 st.markdown("""
     <style>
-    /* 전체 배경: 딥 다크 (Bridge 배경색과 유사) */
+    /* 전체 배경: 딥 다크 */
     .stApp {
         background-color: #0F1115; 
         color: #FFFFFF;
@@ -22,43 +21,71 @@ st.markdown("""
         border-right: 1px solid #2D3035;
     }
     
-    /* 상단 메트릭 카드 디자인 (HTML/CSS로 직접 구현) */
+    /* 상단 메트릭 카드 디자인 */
     .metric-card {
         background-color: #1C1F26;
         border: 1px solid #2D3035;
         border-radius: 8px;
         padding: 20px;
         text-align: left;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        margin-bottom: 10px;
     }
-    .metric-label {
-        font-size: 14px;
-        color: #9CA3AF;
-        margin-bottom: 5px;
+    .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
+    .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
+    
+    /* [NEW] 리더보드(순위) 리스트 스타일 */
+    .ranking-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: #16191E; /* 사이드바와 같은 톤 */
+        border: 1px solid #2D3035;
+        border-radius: 6px;
+        padding: 15px 20px;
+        margin-bottom: 8px;
+        transition: all 0.2s ease;
     }
-    .metric-value {
-        font-size: 28px;
-        font-weight: 700;
-        color: #FFFFFF;
+    /* 마우스 올렸을 때 효과 (이미지의 녹색 포인트 반영) */
+    .ranking-row:hover {
+        border-color: #10B981; /* Bridge Green */
+        background-color: #1C1F26;
+        transform: translateX(5px); /* 살짝 오른쪽으로 이동 */
     }
-    .metric-delta {
-        font-size: 14px;
+    
+    .rank-num {
+        font-size: 18px;
+        font-weight: bold;
+        color: #10B981; /* 순위 숫자 녹색 */
+        width: 40px;
+    }
+    .rank-handle {
+        font-size: 16px;
         font-weight: 600;
+        color: #E5E7EB;
+        flex-grow: 1; /* 중간 공간 차지 */
+        padding-left: 10px;
     }
-    .positive { color: #10B981; } /* Bridge 스타일 그린 */
-    .negative { color: #EF4444; }
+    .rank-followers {
+        font-size: 16px;
+        color: #9CA3AF;
+        text-align: right;
+    }
+    .rank-category {
+        font-size: 12px;
+        color: #6B7280;
+        background-color: #374151;
+        padding: 2px 8px;
+        border-radius: 12px;
+        margin-right: 15px;
+    }
     
-    /* 텍스트 스타일 */
+    /* 텍스트 및 차트 스타일 */
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
-    
-    /* Plotly 차트 배경 투명화 */
-    .js-plotly-plot .plotly .main-svg {
-        background-color: rgba(0,0,0,0) !important;
-    }
+    .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 로드 및 전처리
+# 3. 데이터 로드
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
@@ -76,27 +103,21 @@ def get_data():
 
 df = get_data()
 
-# 4. 사이드바 메뉴 (Bridge 스타일 흉내)
+# 4. 사이드바
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/25/25231.png", width=40) # 로고 플레이스홀더
     st.markdown("### **MINDSHARE**")
-    
-    # 카테고리 필터
     available_cats = ["전체보기"]
     if not df.empty:
         available_cats.extend(sorted(df['category'].unique().tolist()))
-    
     selected_category = st.radio(" ", available_cats, label_visibility="collapsed")
     
     st.divider()
-    
-    # 관리자 메뉴 (하단 배치)
     for _ in range(15): st.write("")
-    with st.expander("⚙️ Admin Access", expanded=False):
+    with st.expander("⚙️ Admin", expanded=False):
         admin_pw = st.text_input("Key", type="password")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
 
-# 5. 메인 대시보드 레이아웃
+# 5. 메인 화면
 st.title(f"한국 커뮤니티 마인드쉐어")
 st.caption(f"Korean Community Keyword Mindshare - {selected_category}")
 
@@ -107,108 +128,78 @@ if not df.empty:
     else:
         display_df = df[(df['category'] == selected_category) & (df['followers'] > 0)]
 
-    # [NEW] 상단 요약 메트릭 카드 섹션 (HTML 삽입)
-    total_accounts = len(display_df)
-    total_followers = display_df['followers'].sum()
-    if not display_df.empty:
-        top_handle = display_df.loc[display_df['followers'].idxmax()]['handle']
-    else:
-        top_handle = "-"
-
-    # 화면을 4분할로 나눔
+    # 5-1. 상단 요약 카드
     col1, col2, col3, col4 = st.columns(4)
+    total_acc = len(display_df)
+    total_fol = display_df['followers'].sum()
+    top_one = display_df.loc[display_df['followers'].idxmax()]['handle'] if not display_df.empty else "-"
     
     with col1:
-        st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">전체 계정 (Accounts)</div>
-                <div class="metric-value">{total_accounts}</div>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-label">전체 계정</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">총 팔로워 (Total Reach)</div>
-                <div class="metric-value">{total_followers:,.0f}</div>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-label">총 팔로워</div><div class="metric-value">{total_fol:,.0f}</div></div>', unsafe_allow_html=True)
     with col3:
-        st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">최고 영향력 (Top)</div>
-                <div class="metric-value">{top_handle}</div>
-                <div class="metric-delta positive">▲ Dominant</div>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-label">최고 영향력</div><div class="metric-value">{top_one}</div></div>', unsafe_allow_html=True)
     with col4:
-        st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">조회 기간</div>
-                <div class="metric-value">7일</div>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-label">기간</div><div class="metric-value">7일</div></div>', unsafe_allow_html=True)
 
     st.write("") # 간격
 
-    # [NEW] 메인 트리맵 차트 (Bridge 스타일 컬러링)
+    # 5-2. 메인 차트 (트리맵)
     if not display_df.empty:
-        # 1. 색상 매핑: Bridge 느낌의 딥한 컬러 팔레트
-        custom_colors = [
-            '#D97706', # Amber (BTC 느낌)
-            '#2563EB', # Blue (ETH/Base 느낌)
-            '#059669', # Green (Solana 느낌)
-            '#DC2626', # Red
-            '#7C3AED', # Purple
-            '#DB2777', # Pink
-            '#4B5563'  # Gray
-        ]
-        
         fig = px.treemap(
             display_df, 
             path=['category', 'handle'], 
             values='followers',
-            color='category', # 카테고리별 색상 구분
-            color_discrete_sequence=custom_colors,
+            color='category',
+            color_discrete_sequence=['#D97706', '#2563EB', '#059669', '#DC2626', '#7C3AED'],
             template="plotly_dark"
         )
-        
-        # 차트 스타일링: 모서리 느낌과 텍스트 강조
         fig.update_traces(
             textinfo="label+value",
             textfont=dict(size=20, family="Arial", color="white"),
-            textposition="middle center",
-            marker=dict(line=dict(width=2, color='#0F1115')), # 블록 간격(배경색과 동일하게 하여 띄워진 느낌)
+            marker=dict(line=dict(width=2, color='#0F1115')),
             root_color="#16191E"
         )
-        
-        # 레이아웃 마진 제거 (꽉 차게)
-        fig.update_layout(
-            margin=dict(t=20, l=0, r=0, b=0),
-            paper_bgcolor='rgba(0,0,0,0)',
-            height=600 # 차트 높이 키움
-        )
-        
+        fig.update_layout(margin=dict(t=20, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)', height=500)
         st.plotly_chart(fig, use_container_width=True)
 
-        # 하단 상세 테이블 (선택사항)
-        with st.expander("📋 데이터 상세 보기"):
-            st.dataframe(
-                display_df[['category', 'handle', 'followers']].sort_values('followers', ascending=False),
-                use_container_width=True,
-                hide_index=True
-            )
+        # 5-3. [핵심 변경] 리더보드 스타일 순위 리스트
+        st.write("")
+        st.subheader("🏆 채널 랭킹 (Leaderboard)")
+        
+        # 데이터를 팔로워 순으로 정렬
+        ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
+        
+        # 리스트 출력 (HTML 생성)
+        list_html = ""
+        for index, row in ranking_df.iterrows():
+            rank = index + 1
+            # 상위 3등까지는 왕관 이모지 추가 (선택사항)
+            medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
+            
+            list_html += f"""
+            <div class="ranking-row">
+                <div class="rank-num">{medal}</div>
+                <div class="rank-category">{row['category']}</div>
+                <div class="rank-handle">@{row['handle']}</div>
+                <div class="rank-followers">{int(row['followers']):,} 팔로워</div>
+            </div>
+            """
+        
+        # 스크롤 가능한 영역에 리스트 표시 (너무 길어질 경우 대비)
+        with st.container(height=400):
+            st.markdown(list_html, unsafe_allow_html=True)
 
 else:
-    st.info("데이터가 없습니다. 관리자 모드에서 데이터를 추가해주세요.")
+    st.info("데이터가 없습니다.")
 
-# 6. 관리자 편집기 (이전 코드의 오류 수정 반영)
+# 6. 관리자 편집기
 if is_admin:
     st.divider()
-    st.header("🛠️ Admin Data Editor")
-    
+    st.header("🛠️ Admin Editor")
     edited_df = st.data_editor(df, use_container_width=True, num_rows="dynamic")
-
-    if st.button("Save Changes", type="primary"):
+    if st.button("Save", type="primary"):
         try:
             conn.update(worksheet="Sheet1", data=edited_df)
             st.success("Updated!")
