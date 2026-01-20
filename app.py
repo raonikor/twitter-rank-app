@@ -134,15 +134,22 @@ if not df.empty:
             textfont=dict(size=20, family="sans-serif", color="white"),
             textposition="middle center",
             
-            # [핵심 변경] width를 6 -> 2로 줄임 (간격 축소)
-            marker=dict(line=dict(width=2, color='#0F1115')), 
+            # [핵심 변경 1] 테두리(간격) 색상을 #000000(완전 검정)으로 설정
+            marker=dict(line=dict(width=2, color='#000000')), 
             
-            root_color="#16191E",
+            # [핵심 변경 2] 차트 루트 배경색을 #000000(완전 검정)으로 설정
+            root_color="#000000",
+            
             hovertemplate='<b>%{customdata[0]}</b><br><span style="color:#9CA3AF">@%{label}</span><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
         )
         
         fig.update_layout(
-            margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=600, font=dict(family="sans-serif"),
+            margin=dict(t=0, l=0, r=0, b=0), 
+            # [핵심 변경 3] 차트 전체 배경을 #000000(완전 검정)으로 설정
+            paper_bgcolor='#000000', 
+            plot_bgcolor='#000000', 
+            height=600, 
+            font=dict(family="sans-serif"),
             hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1),
             coloraxis_showscale=False 
         )
