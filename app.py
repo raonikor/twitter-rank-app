@@ -3,7 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 
-# 1. 페이지 설정 (탭 이름도 변경)
+# 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵", layout="wide")
 
 # 2. CSS 스타일 (Bridge 스타일 + 리더보드 + 프로필 이미지)
@@ -17,17 +17,12 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* 리스트 스타일 */
+    /* 리더보드 리스트 스타일 */
     .ranking-row { display: flex; align-items: center; justify-content: space-between; background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 10px 20px; margin-bottom: 8px; transition: all 0.2s ease; }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
     .rank-num { font-size: 18px; font-weight: bold; color: #10B981; width: 30px; }
-    
-    /* 프로필 이미지 스타일 */
-    .rank-img {
-        width: 40px; height: 40px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 15px; object-fit: cover;
-    }
-    
+    .rank-img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 15px; object-fit: cover; }
     .rank-handle { font-size: 16px; font-weight: 600; color: #E5E7EB; flex-grow: 1; }
     .rank-followers { font-size: 14px; color: #9CA3AF; text-align: right; min-width: 100px; }
     .rank-category { font-size: 11px; color: #9CA3AF; background-color: #374151; padding: 2px 8px; border-radius: 12px; margin-right: 15px; }
@@ -62,7 +57,6 @@ with st.sidebar:
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
 
 # 5. 메인 화면
-# [수정 1] 타이틀 변경
 st.title(f"트위터 팔로워 맵") 
 st.caption(f"Twitter Follower Map - {selected_category}")
 
@@ -88,18 +82,29 @@ if not df.empty:
             display_df, path=['category', 'handle'], values='followers', color='category',
             color_discrete_sequence=bridge_colors, template="plotly_dark"
         )
+        
+        # [핵심 변경] 텍스트 템플릿 수정 (점유율 퍼센트 추가)
         fig.update_traces(
-            textinfo="label+value", textfont=dict(size=24, family="sans-serif", weight="bold", color="white"),
-            textposition="middle center", marker=dict(line=dict(width=3, color='#0F1115')), root_color="#16191E",
-            hovertemplate='<b>%{label}</b><br>Followers: %{value:,.0f}<extra></extra>'
+            # texttemplate을 사용하여 3줄로 표시:
+            # 1. 굵은 핸들명
+            # 2. 팔로워 숫자
+            # 3. 전체 대비 점유율 (소수점 1자리)
+            texttemplate='<b>%{label}</b><br>%{value:,.0f}<br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
+            
+            textfont=dict(size=24, family="sans-serif", color="white"),
+            textposition="middle center",
+            marker=dict(line=dict(width=3, color='#0F1115')), 
+            root_color="#16191E",
+            hovertemplate='<b>%{label}</b><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
         )
+        
         fig.update_layout(
             margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=600, font=dict(family="sans-serif"),
             hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1)
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # [수정 2] 리더보드 제목 변경
+        # 리더보드
         st.write("")
         st.subheader("🏆 팔로워 순위 (Leaderboard)")
         
@@ -109,10 +114,9 @@ if not df.empty:
         for index, row in ranking_df.iterrows():
             rank = index + 1
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
-            
-            # 자동 프사 기능 유지
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
             
+            # 리더보드에도 퍼센트 정보 추가? (선택사항 - 현재는 깔끔함을 위해 팔로워만 표시)
             list_html += f"""
             <div class="ranking-row">
                 <div class="rank-num">{medal}</div>
