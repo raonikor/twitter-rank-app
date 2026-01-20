@@ -3,34 +3,29 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 
-# 1. 페이지 설정
-st.set_page_config(page_title="Korean Community Mindshare", layout="wide")
+# 1. 페이지 설정 (탭 이름도 변경)
+st.set_page_config(page_title="트위터 팔로워 맵", layout="wide")
 
-# 2. CSS 스타일
+# 2. CSS 스타일 (Bridge 스타일 + 리더보드 + 프로필 이미지)
 st.markdown("""
     <style>
     .stApp { background-color: #0F1115; color: #FFFFFF; }
     [data-testid="stSidebar"] { background-color: #16191E; border-right: 1px solid #2D3035; }
     
-    /* 카드 디자인 */
+    /* 상단 요약 카드 */
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* 리더보드 리스트 스타일 */
+    /* 리스트 스타일 */
     .ranking-row { display: flex; align-items: center; justify-content: space-between; background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 10px 20px; margin-bottom: 8px; transition: all 0.2s ease; }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
     .rank-num { font-size: 18px; font-weight: bold; color: #10B981; width: 30px; }
     
-    /* [NEW] 프로필 이미지 스타일 */
+    /* 프로필 이미지 스타일 */
     .rank-img {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%; /* 원형 */
-        border: 2px solid #2D3035;
-        margin-right: 15px;
-        object-fit: cover;
+        width: 40px; height: 40px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 15px; object-fit: cover;
     }
     
     .rank-handle { font-size: 16px; font-weight: 600; color: #E5E7EB; flex-grow: 1; }
@@ -67,8 +62,9 @@ with st.sidebar:
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
 
 # 5. 메인 화면
-st.title(f"한국 커뮤니티 마인드쉐어")
-st.caption(f"Korean Community Keyword Mindshare - {selected_category}")
+# [수정 1] 타이틀 변경
+st.title(f"트위터 팔로워 맵") 
+st.caption(f"Twitter Follower Map - {selected_category}")
 
 if not df.empty:
     if selected_category == "전체보기": display_df = df[df['followers'] > 0]
@@ -103,9 +99,10 @@ if not df.empty:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # [핵심] 리더보드 + 프로필 이미지 자동 연동
+        # [수정 2] 리더보드 제목 변경
         st.write("")
-        st.subheader("🏆 채널 랭킹 (Leaderboard)")
+        st.subheader("🏆 팔로워 순위 (Leaderboard)")
+        
         ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
         list_html = ""
         
@@ -113,8 +110,7 @@ if not df.empty:
             rank = index + 1
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
             
-            # [자동 프사 기능] unavatar.io를 사용하여 핸들명 기반으로 프사 가져오기
-            # 예: @elonmusk -> https://unavatar.io/twitter/elonmusk
+            # 자동 프사 기능 유지
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
             
             list_html += f"""
