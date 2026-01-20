@@ -60,16 +60,20 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 로드
+# 3. 데이터 로드 (API 최소화 핵심 로직)
 conn = st.connection("gsheets", type=GSheetsConnection)
+
 def get_data():
     try:
-        df = conn.read(ttl="0") 
+        # [핵심 변경] ttl="24h" -> 24시간 동안 캐시 유지 (즉, 버튼 안 누르면 API 호출 안 함)
+        df = conn.read(ttl="24h") 
+        
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
             df['category'] = df['category'].fillna('미분류') if 'category' in df.columns else '미분류'
             df['handle'] = df['handle'].astype(str)
             
+            # 구글 시트에 name이 비어있으면 핸들로 채움
             if 'name' not in df.columns:
                 df['name'] = df['handle'] 
             else:
@@ -77,6 +81,7 @@ def get_data():
                 
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category'])
+
 df = get_data()
 
 # 4. 사이드바
@@ -99,8 +104,8 @@ if not df.empty:
     if selected_category == "전체보기": display_df = df[df['followers'] > 0]
     else: display_df = df[(df['category'] == selected_category) & (df['followers'] > 0)]
 
-    # [수정] 상단 요약 카드 (4분할 -> 3분할)
-    col1, col2, col3 = st.columns(3) # 컬럼을 3개로 줄임
+    # 상단 요약 카드 (3분할)
+    col1, col2, col3 = st.columns(3)
     
     total_acc = len(display_df)
     total_fol = display_df['followers'].sum()
@@ -110,7 +115,6 @@ if not df.empty:
     with col1: st.markdown(f'<div class="metric-card"><div class="metric-label">전체 계정</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
     with col2: st.markdown(f'<div class="metric-card"><div class="metric-label">총 팔로워</div><div class="metric-value">{total_fol:,.0f}</div></div>', unsafe_allow_html=True)
     with col3: st.markdown(f'<div class="metric-card"><div class="metric-label">최고 영향력</div><div class="metric-value" style="font-size:20px;">{top_one_text}</div></div>', unsafe_allow_html=True)
-    # 기간(7일) 카드 제거됨
     
     st.write("")
 
@@ -175,63 +179,22 @@ if not df.empty:
         with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
 else: st.info("데이터가 없습니다.")
 
-# 6. 관리자 에디터
+# 6. [NEW] API 절약형 관리자 대시보드
 if is_admin:
     st.divider()
     st.header("🛠️ Admin Dashboard")
-    tab1, tab2 = st.tabs(["➕ 새 채널 추가", "✏️ 전체 데이터 수정"])
+    st.info("데이터 관리는 구글 스프레드시트에서 직접 수행하세요.")
     
-    with tab1:
-        st.write("핸들과 이름을 함께 입력해주세요.")
-        with st.form("add_channel_form"):
-            col_a, col_b, col_c = st.columns([1, 1, 1])
-            with col_a:
-                new_handle = st.text_input("핸들 (ID)", placeholder="예: elonmusk")
-                new_name = st.text_input("표시 이름 (Name)", placeholder="예: Elon Musk")
-            with col_b:
-                new_followers = st.number_input("팔로워 수", min_value=0, step=100)
-            with col_c:
-                existing_cats = sorted(df['category'].unique().tolist())
-                new_category_select = st.selectbox("카테고리", ["직접 입력"] + existing_cats, index=1 if existing_cats else 0)
-                new_category_input = st.text_input("새 카테고리") if new_category_select == "직접 입력" else ""
+    col1, col2 = st.columns([1, 3])
+    
+    with col1:
+        # 버튼을 누르면 캐시를 날리고(clear) 앱을 다시 실행(rerun) -> 이때만 API 호출됨
+        if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
             
-            if st.form_submit_button("💾 추가하기", type="primary"):
-                final_cat = new_category_input if new_category_select == "직접 입력" else new_category_select
-                clean_handle = new_handle.replace("@", "").strip()
-                final_name = new_name if new_name else clean_handle
-                
-                if clean_handle and final_cat:
-                    new_data = pd.DataFrame([{'handle': clean_handle, 'name': final_name, 'followers': new_followers, 'category': final_cat}])
-                    updated_df = pd.concat([df, new_data], ignore_index=True)
-                    try:
-                        conn.update(worksheet="Sheet1", data=updated_df)
-                        st.success("추가 완료!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e: st.error(f"실패: {e}")
-
-    with tab2:
-        st.write("표에서 이름을 직접 수정할 수 있습니다.")
-        unique_cats = sorted(df['category'].unique().tolist())
-        
-        edited_df = st.data_editor(
-            df,
-            use_container_width=True,
-            num_rows="dynamic",
-            column_config={
-                "name": st.column_config.TextColumn("표시 이름 (Name)", required=True),
-                "handle": st.column_config.TextColumn("핸들 (@ID)", required=True),
-                "followers": st.column_config.NumberColumn("팔로워", format="%d"),
-                "category": st.column_config.SelectboxColumn("카테고리", options=unique_cats, required=True),
-                "chart_label": None
-            },
-            key="admin_editor"
-        )
-        if st.button("💾 저장하기", type="primary"):
-            try:
-                save_df = edited_df[['handle', 'name', 'followers', 'category']]
-                conn.update(worksheet="Sheet1", data=save_df)
-                st.success("저장 완료!")
-                st.cache_data.clear()
-                st.rerun()
-            except Exception as e: st.error(f"오류: {e}")
+    with col2:
+        st.write("👈 **시트 수정 후 이 버튼을 눌러야 반영됩니다.** (평소엔 API 호출 안 함)")
+    
+    # (선택사항) 구글 시트 링크를 알고 계시다면 아래 url에 넣으세요
+    # st.link_button("📂 구글 시트 열기", "https://docs.google.com/spreadsheets/...")
