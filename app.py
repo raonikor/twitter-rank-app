@@ -1,3 +1,10 @@
+네, 상단 요약 카드에서 **'기간'**을 제거하고, 남은 3개의 카드(전체 계정, 총 팔로워, 최고 영향력)가 화면을 꽉 채우도록 수정했습니다.
+
+이제 상단 영역이 3등분되어 더욱 시원하게 보일 것입니다.
+
+### ✂️ 기간 카드가 제거된 최종 `app.py`
+
+```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -29,7 +36,7 @@ st.markdown("""
     .rank-name { font-size: 16px; font-weight: 700; color: #FFFFFF; line-height: 1.2; }
     .rank-handle { font-size: 13px; font-weight: 400; color: #9CA3AF; line-height: 1.2; }
     
-    /* [NEW] 점유율(%) 스타일 */
+    /* 점유율(%) 스타일 */
     .rank-share { 
         font-size: 15px; 
         font-weight: 700; 
@@ -99,8 +106,9 @@ if not df.empty:
     if selected_category == "전체보기": display_df = df[df['followers'] > 0]
     else: display_df = df[(df['category'] == selected_category) & (df['followers'] > 0)]
 
-    # 상단 요약 카드
-    col1, col2, col3, col4 = st.columns(4)
+    # [수정] 상단 요약 카드 (4분할 -> 3분할)
+    col1, col2, col3 = st.columns(3) # 컬럼을 3개로 줄임
+    
     total_acc = len(display_df)
     total_fol = display_df['followers'].sum()
     top_one = display_df.loc[display_df['followers'].idxmax()] if not display_df.empty else None
@@ -109,12 +117,12 @@ if not df.empty:
     with col1: st.markdown(f'<div class="metric-card"><div class="metric-label">전체 계정</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
     with col2: st.markdown(f'<div class="metric-card"><div class="metric-label">총 팔로워</div><div class="metric-value">{total_fol:,.0f}</div></div>', unsafe_allow_html=True)
     with col3: st.markdown(f'<div class="metric-card"><div class="metric-label">최고 영향력</div><div class="metric-value" style="font-size:20px;">{top_one_text}</div></div>', unsafe_allow_html=True)
-    with col4: st.markdown(f'<div class="metric-card"><div class="metric-label">기간</div><div class="metric-value">7일</div></div>', unsafe_allow_html=True)
+    # 기간(7일) 카드 제거됨
+    
     st.write("")
 
     # 메인 차트 (트리맵)
     if not display_df.empty:
-        # 차트 라벨
         display_df['chart_label'] = display_df['name'] + "<br><span style='font-size:0.7em; font-weight:normal;'>@" + display_df['handle'] + "</span>"
 
         fig = px.treemap(
@@ -149,7 +157,6 @@ if not df.empty:
         st.subheader("🏆 팔로워 순위 (Leaderboard)")
         
         ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
-        # [NEW] 현재 화면에 보이는 전체 팔로워 합계 계산
         view_total = ranking_df['followers'].sum()
         
         list_html = ""
@@ -157,8 +164,6 @@ if not df.empty:
             rank = index + 1
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
-            
-            # [NEW] 점유율(Share) 계산
             share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
             
             list_html += f"""
@@ -237,3 +242,5 @@ if is_admin:
                 st.cache_data.clear()
                 st.rerun()
             except Exception as e: st.error(f"오류: {e}")
+
+```
