@@ -214,4 +214,65 @@ if menu == "트위터 팔로워 맵":
             )
             
             fig.update_layout(
-                margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='#000000', plot_bgcolor='#0
+                margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='#000000', plot_bgcolor='#000000', height=600, 
+                font=dict(family="sans-serif"), coloraxis_showscale=False,
+                hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1)
+            )
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+            st.write("")
+            st.subheader("🏆 팔로워 순위 (Leaderboard)")
+            
+            ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
+            view_total = ranking_df['followers'].sum()
+            
+            list_html = ""
+            for index, row in ranking_df.iterrows():
+                rank = index + 1
+                medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
+                img_url = f"https://unavatar.io/twitter/{row['handle']}"
+                share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
+                
+                list_html += f"""
+                <div class="ranking-row">
+                    <div class="rank-num">{medal}</div>
+                    <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
+                    <div class="rank-info">
+                        <div class="rank-name">{row['name']}</div>
+                        <div class="rank-handle">@{row['handle']}</div>
+                    </div>
+                    <div class="rank-category">{row['category']}</div>
+                    <div class="rank-share">{share_pct:.1f}%</div>
+                    <div class="rank-followers">{int(row['followers']):,}</div>
+                </div>
+                """
+            with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
+    else: st.info("데이터가 없습니다.")
+
+# ==========================================
+# [PAGE 2] 실시간 트위터 (NEW)
+# ==========================================
+elif menu == "실시간 트위터":
+    twitter_logic.render_twitter_page()
+
+# ==========================================
+# [PAGE 3] 지수 비교 (Indices)
+# ==========================================
+elif menu == "지수 비교 (Indices)":
+    market_logic.render_market_page()
+
+# ==========================================
+# [PAGE 4] 텔레그램 이벤트
+# ==========================================
+elif menu == "텔레그램 이벤트":
+    event_logic.render_event_page(conn)
+
+if is_admin:
+    st.divider()
+    st.header("🛠️ Admin Dashboard")
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+    with col2: st.write("👈 데이터를 새로고침합니다.")
