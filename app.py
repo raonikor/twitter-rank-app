@@ -322,4 +322,7 @@ if is_admin:
     st.header("🛠️ Admin Dashboard")
     col1, col2 = st.columns([1, 3])
     with col1:
-        if st.button("🔄 데이터 동기화 (Sync)", type="primary
+        if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+    with col2: st.write("👈 데이터를 새로고침합니다.")
