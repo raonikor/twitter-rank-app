@@ -9,62 +9,73 @@ from datetime import datetime, timedelta, timezone
 # 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵 & 마켓", layout="wide")
 
-# 2. CSS 스타일 (제미니 스타일 사이드바 + 기존 스타일)
+# 2. CSS 스타일
 st.markdown("""
     <style>
     /* 전체 배경 */
     .stApp { background-color: #0F1115; color: #FFFFFF; }
     
-    /* [NEW] 제미니 스타일 사이드바 CSS */
+    /* 사이드바 스타일 */
     [data-testid="stSidebar"] { 
-        background-color: #1E1F20; /* 제미니 사이드바 배경색 */
+        background-color: #1E1F20; 
         border-right: 1px solid #333;
     }
     
-    /* 사이드바 라디오 버튼 컨테이너 */
+    /* 사이드바 라디오 버튼 컨테이너 (간격 최소화) */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] {
-        gap: 4px; /* 항목 간 간격 */
+        gap: 2px; /* 항목 간 간격 더 줄임 */
     }
 
-    /* 라디오 버튼의 동그라미 숨기기 (핵심!) */
+    /* 라디오 버튼의 동그라미 숨기기 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label > div:first-child {
         display: none !important;
     }
 
-    /* 메뉴 항목 디자인 (기본 상태) */
+    /* 메뉴 항목 디자인 (기본 상태) - 글씨 밝게, 간격 좁게 수정 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
         display: flex;
         width: 100%;
-        padding: 10px 16px !important;
-        border-radius: 20px !important; /* 제미니 특유의 둥근 모서리 */
+        padding: 6px 12px !important; /* [수정] 위아래 패딩 줄임 (10px -> 6px) */
+        border-radius: 8px !important; /* 모서리 살짝 덜 둥글게 (공간 효율) */
         border: none !important;
         background-color: transparent;
-        color: #E3E3E3 !important;
+        color: #FFFFFF !important; /* [수정] 글씨색 완전 흰색으로 변경 */
         transition: all 0.2s ease;
-        margin-bottom: 2px;
+        margin-bottom: 1px; /* [수정] 마진 줄임 */
         font-size: 14px;
         font-weight: 500;
+        line-height: 1.4; /* 줄 간격 정리 */
     }
 
     /* 마우스 올렸을 때 (Hover) */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover {
-        background-color: #282A2C !important; /* 연한 회색 */
+        background-color: #282A2C !important;
         color: #FFFFFF !important;
     }
 
-    /* [핵심] 선택된 항목 (Active) - 파란색 배경 */
-    /* :has() 선택자를 사용하여 체크된 input이 있는 label을 스타일링 */
+    /* 선택된 항목 (Active) - 파란색 배경 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) {
-        background-color: #004A77 !important; /* 제미니 블루 */
-        color: #D3E3FD !important; /* 밝은 텍스트 */
+        background-color: #004A77 !important;
+        color: #FFFFFF !important; /* 선택시 글자도 흰색 유지 */
         font-weight: 600;
+    }
+
+    /* 사이드바 헤더 (소제목) 스타일 - 밝게 수정 */
+    .sidebar-header {
+        font-size: 11px;
+        font-weight: 700;
+        color: #E0E0E0; /* [수정] 밝은 은색으로 변경 (가독성 UP) */
+        margin-top: 15px; /* 간격 줄임 */
+        margin-bottom: 5px;
+        padding-left: 8px;
+        text-transform: uppercase;
+        opacity: 0.9;
     }
 
     /* ---------------------------------------------------- */
     /* 기존 앱 스타일 유지 */
     /* ---------------------------------------------------- */
     
-    /* 상단 요약 카드 */
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
@@ -72,7 +83,6 @@ st.markdown("""
     .delta-up { color: #10B981; }
     .delta-down { color: #EF4444; }
     
-    /* 리더보드 리스트 스타일 */
     .ranking-row { 
         display: flex; align-items: center; justify-content: space-between; 
         background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
@@ -96,11 +106,9 @@ st.markdown("""
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
 
-    /* 차트 인터랙션 */
     .js-plotly-plot .plotly .main-svg g.shapelayer path { transition: filter 0.2s ease; cursor: pointer; }
     .js-plotly-plot .plotly .main-svg g.shapelayer path:hover { filter: brightness(1.2) !important; opacity: 1 !important; }
 
-    /* 방문자 카운터 스타일 */
     .visitor-box {
         background-color: #1C1F26;
         border: 1px solid #2D3035;
@@ -114,23 +122,12 @@ st.markdown("""
     .vis-today { color: #10B981; }
     .vis-total { color: #E5E7EB; }
     .vis-divider { height: 1px; background-color: #2D3035; margin: 8px 0; }
-    
-    /* 사이드바 헤더 스타일 */
-    .sidebar-header {
-        font-size: 12px;
-        font-weight: 600;
-        color: #9CA3AF;
-        margin-top: 20px;
-        margin-bottom: 10px;
-        padding-left: 10px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
 # 3. 데이터 로드 및 방문자 처리
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 방문자수 로직
 def check_and_update_visitors():
     try:
         v_df = conn.read(worksheet="visitors", ttl=0)
@@ -168,7 +165,6 @@ def check_and_update_visitors():
 
 total_visitors, today_visitors = check_and_update_visitors()
 
-
 @st.cache_data(ttl="30m") 
 def get_sheet_data():
     try:
@@ -199,14 +195,12 @@ def get_market_data():
         except: continue
     return pd.DataFrame(market_df)
 
-# 4. 사이드바 구성 (제미니 스타일 적용)
+# 4. 사이드바 구성 (Raoni Map 스타일)
 with st.sidebar:
-    # 로고 혹은 앱 이름
-    st.markdown("### **Gemini Map**")
+    # [수정] 타이틀 변경
+    st.markdown("### **Raoni Map**")
     
     st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
-    
-    # 1. 메인 메뉴 (라디오 버튼이지만 버튼처럼 보이게 CSS 적용됨)
     menu = st.radio(" ", ["트위터 팔로워 맵", "지수 비교 (Indices)"], label_visibility="collapsed")
     
     st.divider()
@@ -214,20 +208,15 @@ with st.sidebar:
     if menu == "트위터 팔로워 맵":
         df = get_sheet_data()
         st.markdown('<div class="sidebar-header">카테고리 (CATEGORY)</div>', unsafe_allow_html=True)
-        
         available_cats = ["전체보기"]
         if not df.empty: available_cats.extend(sorted(df['category'].unique().tolist()))
-        
-        # 2. 카테고리 메뉴 (역시 버튼처럼 보임)
         selected_category = st.radio("카테고리 선택", available_cats, label_visibility="collapsed")
     
-    # 하단 영역
     for _ in range(3): st.write("")
     with st.expander("⚙️ 설정 (Admin)", expanded=False):
         admin_pw = st.text_input("Key", type="password")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
 
-    # 방문자 카운터
     st.markdown(f"""
         <div class="visitor-box">
             <div class="vis-label">Today</div>
@@ -321,7 +310,7 @@ if menu == "트위터 팔로워 맵":
     else: st.info("데이터가 없습니다.")
 
 # ==========================================
-# [PAGE 2] 지수 비교 (Market Indices)
+# [PAGE 2] 지수 비교 (Indices)
 # ==========================================
 elif menu == "지수 비교 (Indices)":
     st.title("📊 시장 지수 (Market Indices)")
