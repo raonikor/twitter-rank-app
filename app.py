@@ -3,9 +3,10 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 import numpy as np
+import yfinance as yf  # [NEW] 주가 데이터 라이브러리
 
 # 1. 페이지 설정
-st.set_page_config(page_title="트위터 팔로워 맵", layout="wide")
+st.set_page_config(page_title="트위터 팔로워 맵 & 마켓", layout="wide")
 
 # 2. CSS 스타일
 st.markdown("""
@@ -17,6 +18,9 @@ st.markdown("""
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
+    .metric-delta { font-size: 14px; font-weight: 500; margin-top: 5px; }
+    .delta-up { color: #10B981; }
+    .delta-down { color: #EF4444; }
     
     /* 리더보드 리스트 스타일 (슬림) */
     .ranking-row { 
@@ -42,13 +46,9 @@ st.markdown("""
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
 
-    /* 차트 인터랙션 (블록 개별 강조) */
-    .js-plotly-plot .plotly .main-svg g.shapelayer path {
-        transition: filter 0.2s ease; cursor: pointer;
-    }
-    .js-plotly-plot .plotly .main-svg g.shapelayer path:hover {
-        filter: brightness(1.2) !important; opacity: 1 !important;
-    }
+    /* 차트 인터랙션 */
+    .js-plotly-plot .plotly .main-svg g.shapelayer path { transition: filter 0.2s ease; cursor: pointer; }
+    .js-plotly-plot .plotly .main-svg g.shapelayer path:hover { filter: brightness(1.2) !important; opacity: 1 !important; }
 
     /* 사이드바 메뉴 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
@@ -60,147 +60,232 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 로드
+# 3. 데이터 로드 함수들
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-def get_data():
+@st.cache_data(ttl="30m") # 구글 시트 데이터 캐싱
+def get_sheet_data():
     try:
-        df = conn.read(ttl="30m") 
+        df = conn.read(ttl="0") 
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
             df['category'] = df['category'].fillna('미분류') if 'category' in df.columns else '미분류'
             df['handle'] = df['handle'].astype(str)
-            
-            if 'name' not in df.columns:
-                df['name'] = df['handle'] 
-            else:
-                df['name'] = df['name'].fillna(df['handle'])
-                
+            if 'name' not in df.columns: df['name'] = df['handle'] 
+            else: df['name'] = df['name'].fillna(df['handle'])
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category'])
 
-df = get_data()
+@st.cache_data(ttl="5m") # [NEW] 주가 데이터 캐싱 (5분 주기)
+def get_market_data():
+    # KOSPI(^KS11), Gold(GC=F), Ethereum(ETH-USD)
+    tickers = {'KOSPI': '^KS11', 'GOLD': 'GC=F', 'ETH': 'ETH-USD'}
+    market_df = []
+    
+    for name, ticker in tickers.items():
+        try:
+            # 최근 2일치 데이터 가져와서 변동률 계산
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="2d")
+            
+            if len(hist) >= 1:
+                current_price = hist['Close'].iloc[-1]
+                prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+                change_pct = ((current_price - prev_price) / prev_price) * 100
+                
+                market_df.append({
+                    'Name': name,
+                    'Price': current_price,
+                    'Change': change_pct,
+                    'Category': 'Market'
+                })
+        except:
+            continue
+            
+    return pd.DataFrame(market_df)
 
-# 4. 사이드바
+# 4. 사이드바 구성
 with st.sidebar:
-    st.markdown("### **MINDSHARE**")
-    available_cats = ["전체보기"]
-    if not df.empty: available_cats.extend(sorted(df['category'].unique().tolist()))
-    selected_category = st.radio(" ", available_cats, label_visibility="collapsed")
+    st.markdown("### **NAVIGATION**")
+    # [NEW] 탭 선택 메뉴
+    menu = st.radio(" ", ["트위터 팔로워 맵", "지수 비교 (Indices)"], label_visibility="collapsed")
+    
     st.divider()
-    for _ in range(15): st.write("")
+    
+    # 트위터 맵일 때만 카테고리 필터 표시
+    if menu == "트위터 팔로워 맵":
+        df = get_sheet_data()
+        st.markdown("### **CATEGORY**")
+        available_cats = ["전체보기"]
+        if not df.empty: available_cats.extend(sorted(df['category'].unique().tolist()))
+        selected_category = st.radio(" ", available_cats, label_visibility="collapsed")
+    
+    for _ in range(10): st.write("")
     with st.expander("⚙️ Admin", expanded=False):
         admin_pw = st.text_input("Key", type="password")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
 
-# 5. 메인 화면
-st.title(f"트위터 팔로워 맵") 
-st.caption(f"Twitter Follower Map - {selected_category}")
+# ==========================================
+# [PAGE 1] 트위터 팔로워 맵
+# ==========================================
+if menu == "트위터 팔로워 맵":
+    st.title(f"트위터 팔로워 맵") 
+    st.caption(f"Twitter Follower Map - {selected_category}")
 
-if not df.empty:
-    if selected_category == "전체보기": display_df = df[df['followers'] > 0]
-    else: display_df = df[(df['category'] == selected_category) & (df['followers'] > 0)]
+    if not df.empty:
+        if selected_category == "전체보기": display_df = df[df['followers'] > 0]
+        else: display_df = df[(df['category'] == selected_category) & (df['followers'] > 0)]
 
-    # 상단 요약 카드
-    col1, col2, col3 = st.columns(3)
-    total_acc = len(display_df)
-    total_fol = display_df['followers'].sum()
-    top_one = display_df.loc[display_df['followers'].idxmax()] if not display_df.empty else None
-    top_one_text = f"{top_one['name']}" if top_one is not None else "-"
+        col1, col2, col3 = st.columns(3)
+        total_acc = len(display_df)
+        total_fol = display_df['followers'].sum()
+        top_one = display_df.loc[display_df['followers'].idxmax()] if not display_df.empty else None
+        top_one_text = f"{top_one['name']}" if top_one is not None else "-"
 
-    with col1: st.markdown(f'<div class="metric-card"><div class="metric-label">전체 계정</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
-    with col2: st.markdown(f'<div class="metric-card"><div class="metric-label">총 팔로워</div><div class="metric-value">{total_fol:,.0f}</div></div>', unsafe_allow_html=True)
-    with col3: st.markdown(f'<div class="metric-card"><div class="metric-label">최고 영향력</div><div class="metric-value" style="font-size:20px;">{top_one_text}</div></div>', unsafe_allow_html=True)
+        with col1: st.markdown(f'<div class="metric-card"><div class="metric-label">전체 계정</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
+        with col2: st.markdown(f'<div class="metric-card"><div class="metric-label">총 팔로워</div><div class="metric-value">{total_fol:,.0f}</div></div>', unsafe_allow_html=True)
+        with col3: st.markdown(f'<div class="metric-card"><div class="metric-label">최고 영향력</div><div class="metric-value" style="font-size:20px;">{top_one_text}</div></div>', unsafe_allow_html=True)
+        
+        st.write("")
+
+        if not display_df.empty:
+            display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
+            display_df['chart_label'] = display_df['name'] + "<br><span style='font-size:0.7em; font-weight:normal;'>@" + display_df['handle'] + "</span>"
+
+            fig = px.treemap(
+                display_df, 
+                path=['category', 'chart_label'], 
+                values='followers', 
+                color='log_followers',
+                custom_data=['name'], 
+                color_continuous_scale=[(0.00, '#2E2B4E'), (0.05, '#353263'), (0.10, '#3F3C5C'), (0.15, '#464282'), (0.20, '#4A477A'), (0.25, '#4A5D91'), (0.30, '#4A6FA5'), (0.35, '#537CA8'), (0.40, '#5C8BAE'), (0.45, '#5C98AE'), (0.50, '#5E9CA8'), (0.55, '#5E9E94'), (0.60, '#5F9E7F'), (0.65, '#729E6F'), (0.70, '#859E5F'), (0.75, '#969E5F'), (0.80, '#A89E5F'), (0.85, '#AD905D'), (0.90, '#AE815C'), (0.95, '#AE6E5C'), (1.00, '#AE5C5C')],
+                template="plotly_dark"
+            )
+            
+            fig.update_traces(
+                texttemplate='<b>%{customdata[0]}</b><br><b style="font-size:1.2em">%{value:,.0f}</b><br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
+                textfont=dict(size=20, family="sans-serif", color="white"),
+                textposition="middle center",
+                marker=dict(line=dict(width=3, color='#000000')), 
+                root_color="#000000",
+                hovertemplate='<b>%{customdata[0]}</b><br><span style="color:#9CA3AF">@%{label}</span><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
+            )
+            
+            fig.update_layout(
+                margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='#000000', plot_bgcolor='#000000', height=600, 
+                font=dict(family="sans-serif"), coloraxis_showscale=False,
+                hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1)
+            )
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+            st.write("")
+            st.subheader("🏆 팔로워 순위 (Leaderboard)")
+            
+            ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
+            view_total = ranking_df['followers'].sum()
+            
+            list_html = ""
+            for index, row in ranking_df.iterrows():
+                rank = index + 1
+                medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
+                img_url = f"https://unavatar.io/twitter/{row['handle']}"
+                share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
+                
+                list_html += f"""
+                <div class="ranking-row">
+                    <div class="rank-num">{medal}</div>
+                    <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
+                    <div class="rank-info">
+                        <div class="rank-name">{row['name']}</div>
+                        <div class="rank-handle">@{row['handle']}</div>
+                    </div>
+                    <div class="rank-category">{row['category']}</div>
+                    <div class="rank-share">{share_pct:.1f}%</div>
+                    <div class="rank-followers">{int(row['followers']):,}</div>
+                </div>
+                """
+            with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
+    else: st.info("데이터가 없습니다.")
+
+# ==========================================
+# [PAGE 2] 지수 비교 (Market Indices)
+# ==========================================
+elif menu == "지수 비교 (Indices)":
+    st.title("📊 주요 시장 지수")
+    st.caption("Real-time Market Data (KOSPI, GOLD, ETH)")
     
-    st.write("")
-
-    # 메인 차트 (트리맵)
-    if not display_df.empty:
-        # 로그 스케일 컬럼 생성
-        display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
+    market_df = get_market_data()
+    
+    if not market_df.empty:
+        # 1. 상단 메트릭 카드 표시
+        col1, col2, col3 = st.columns(3)
+        cols = [col1, col2, col3]
+        
+        for idx, row in market_df.iterrows():
+            if idx < 3:
+                name = row['Name']
+                price = row['Price']
+                change = row['Change']
+                
+                color_class = "delta-up" if change >= 0 else "delta-down"
+                arrow = "▲" if change >= 0 else "▼"
+                
+                # 포맷팅 (ETH/GOLD는 소수점, 코스피는 정수)
+                price_fmt = f"{price:,.2f}"
+                
+                with cols[idx]:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">{name}</div>
+                        <div class="metric-value">{price_fmt}</div>
+                        <div class="metric-delta {color_class}">{arrow} {change:.2f}%</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
+        st.write("")
+        st.subheader("🗺️ 마켓 트리맵 (Market Treemap)")
+        
+        # 2. 트리맵 시각화 (등락률에 따른 색상)
+        # 등락률이 0보다 크면 초록(상승), 작으면 빨강(하락) -> 일반적인 금융 차트 컬러
         
         fig = px.treemap(
-            display_df, 
-            path=['category', 'handle'], 
-            values='followers', 
-            color='log_followers',
-            custom_data=['name'], 
-            
-            # 20단계 컬러 스케일
-            color_continuous_scale=[
-                (0.00, '#2E2B4E'), (0.05, '#353263'), (0.10, '#3F3C5C'), (0.15, '#464282'),
-                (0.20, '#4A477A'), (0.25, '#4A5D91'), (0.30, '#4A6FA5'), (0.35, '#537CA8'),
-                (0.40, '#5C8BAE'), (0.45, '#5C98AE'), (0.50, '#5E9CA8'), (0.55, '#5E9E94'),
-                (0.60, '#5F9E7F'), (0.65, '#729E6F'), (0.70, '#859E5F'), (0.75, '#969E5F'),
-                (0.80, '#A89E5F'), (0.85, '#AD905D'), (0.90, '#AE815C'), (0.95, '#AE6E5C'),
-                (1.00, '#AE5C5C')
-            ],
+            market_df,
+            path=['Category', 'Name'],
+            values='Price', # 크기는 가격 기준
+            color='Change', # 색상은 등락률 기준
+            color_continuous_scale=['#EF4444', '#1F2937', '#10B981'], # Red -> Grey -> Green
+            color_continuous_midpoint=0, # 0을 기준으로 색 분기
             template="plotly_dark"
         )
         
         fig.update_traces(
-            texttemplate='<b>%{customdata[0]}</b><br><b style="font-size:1.2em">%{value:,.0f}</b><br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
-            textfont=dict(size=20, family="sans-serif", color="white"),
+            texttemplate='<b>%{label}</b><br>%{value:,.0f}<br>%{color:.2f}%', # 이름, 가격, 등락률 표시
+            textfont=dict(size=24, family="sans-serif", color="white"),
             textposition="middle center",
-            
-            # [핵심 변경] width를 3으로 설정하여 외곽선을 적당히 두껍게
-            marker=dict(line=dict(width=3, color='#000000')), 
-            
-            root_color="#000000",
-            hovertemplate='<b>%{customdata[0]}</b><br><span style="color:#9CA3AF">@%{label}</span><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
+            marker=dict(line=dict(width=3, color='#000000')),
+            root_color="#000000"
         )
         
         fig.update_layout(
             margin=dict(t=0, l=0, r=0, b=0), 
             paper_bgcolor='#000000', 
             plot_bgcolor='#000000', 
-            height=600, 
+            height=500,
             font=dict(family="sans-serif"),
-            hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1),
-            coloraxis_showscale=False 
+            coloraxis_showscale=False
         )
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-        # 리더보드
-        st.write("")
-        st.subheader("🏆 팔로워 순위 (Leaderboard)")
         
-        ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
-        view_total = ranking_df['followers'].sum()
-        
-        list_html = ""
-        for index, row in ranking_df.iterrows():
-            rank = index + 1
-            medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
-            img_url = f"https://unavatar.io/twitter/{row['handle']}"
-            share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
-            
-            list_html += f"""
-            <div class="ranking-row">
-                <div class="rank-num">{medal}</div>
-                <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
-                <div class="rank-info">
-                    <div class="rank-name">{row['name']}</div>
-                    <div class="rank-handle">@{row['handle']}</div>
-                </div>
-                <div class="rank-category">{row['category']}</div>
-                <div class="rank-share">{share_pct:.1f}%</div>
-                <div class="rank-followers">{int(row['followers']):,}</div>
-            </div>
-            """
-        with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
-else: st.info("데이터가 없습니다.")
+    else:
+        st.error("데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")
 
-# 6. 관리자 대시보드
+# 관리자 동기화 버튼 (공통)
 if is_admin:
     st.divider()
     st.header("🛠️ Admin Dashboard")
-    st.info("데이터 관리는 구글 스프레드시트에서 직접 수행하세요.")
-    
     col1, col2 = st.columns([1, 3])
     with col1:
         if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
-    with col2:
-        st.write("👈 **시트 수정 후 이 버튼을 눌러야 반영됩니다.** (자동 갱신 주기: 30분)")
+    with col2: st.write("👈 데이터를 새로고침합니다.")
