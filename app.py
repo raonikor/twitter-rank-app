@@ -8,7 +8,8 @@ from datetime import datetime, timedelta, timezone
 # [모듈 사용]
 import market_logic 
 import visitor_logic
-import event_logic # [NEW] 이벤트 로직 추가
+import event_logic 
+import twitter_logic # [NEW] 트위터 로직 추가
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
@@ -56,8 +57,9 @@ st.markdown("""
     .social-info { display: flex; flex-direction: column; }
     .social-label { font-size: 10px; color: #9CA3AF; margin-bottom: 0px; line-height: 1.2;}
     .social-name { font-size: 13px; font-weight: 700; color: #FFFFFF; line-height: 1.2;}
-    
-    /* [NEW] 이벤트 카드 스타일 */
+    .social-handle { font-size: 11px; color: #6B7280; }
+
+    /* 이벤트 카드 스타일 */
     .event-card-link { text-decoration: none !important; }
     .event-card {
         background-color: #1C1F26;
@@ -68,16 +70,9 @@ st.markdown("""
         transition: all 0.2s ease;
         display: block;
     }
-    .event-card:hover {
-        border-color: #10B981; /* 호버시 초록색 테두리 */
-        background-color: #252830;
-        transform: translateY(-2px);
-    }
+    .event-card:hover { border-color: #10B981; background-color: #252830; transform: translateY(-2px); }
     .event-top { display: flex; align-items: center; margin-bottom: 8px; }
-    .event-badge { 
-        background-color: #004A77; color: #D3E3FD; 
-        font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-right: 10px; 
-    }
+    .event-badge { background-color: #004A77; color: #D3E3FD; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-right: 10px; }
     .event-title { font-size: 18px; font-weight: 700; color: #FFFFFF; }
     .event-prize { font-size: 15px; color: #10B981; font-weight: 600; margin-bottom: 12px; }
     .event-bottom { display: flex; justify-content: space-between; font-size: 13px; color: #9CA3AF; border-top: 1px solid #2D3035; padding-top: 10px; }
@@ -132,8 +127,8 @@ with st.sidebar:
     st.markdown("### **Raoni Map**")
     
     st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
-    # [NEW] '텔레그램 이벤트' 메뉴 추가
-    menu = st.radio(" ", ["트위터 팔로워 맵", "지수 비교 (Indices)", "텔레그램 이벤트"], label_visibility="collapsed")
+    # [NEW] 실시간 트위터 메뉴 추가
+    menu = st.radio(" ", ["트위터 팔로워 맵", "실시간 트위터", "지수 비교 (Indices)", "텔레그램 이벤트"], label_visibility="collapsed")
     
     st.divider()
     
@@ -219,60 +214,4 @@ if menu == "트위터 팔로워 맵":
             )
             
             fig.update_layout(
-                margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='#000000', plot_bgcolor='#000000', height=600, 
-                font=dict(family="sans-serif"), coloraxis_showscale=False,
-                hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1)
-            )
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-            st.write("")
-            st.subheader("🏆 팔로워 순위 (Leaderboard)")
-            
-            ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
-            view_total = ranking_df['followers'].sum()
-            
-            list_html = ""
-            for index, row in ranking_df.iterrows():
-                rank = index + 1
-                medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
-                img_url = f"https://unavatar.io/twitter/{row['handle']}"
-                share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
-                
-                list_html += f"""
-                <div class="ranking-row">
-                    <div class="rank-num">{medal}</div>
-                    <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
-                    <div class="rank-info">
-                        <div class="rank-name">{row['name']}</div>
-                        <div class="rank-handle">@{row['handle']}</div>
-                    </div>
-                    <div class="rank-category">{row['category']}</div>
-                    <div class="rank-share">{share_pct:.1f}%</div>
-                    <div class="rank-followers">{int(row['followers']):,}</div>
-                </div>
-                """
-            with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
-    else: st.info("데이터가 없습니다.")
-
-# ==========================================
-# [PAGE 2] 지수 비교 (Indices)
-# ==========================================
-elif menu == "지수 비교 (Indices)":
-    market_logic.render_market_page()
-
-# ==========================================
-# [PAGE 3] 텔레그램 이벤트 (Telegram Events)
-# ==========================================
-elif menu == "텔레그램 이벤트":
-    # [NEW] 이벤트 페이지 렌더링
-    event_logic.render_event_page(conn)
-
-if is_admin:
-    st.divider()
-    st.header("🛠️ Admin Dashboard")
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-    with col2: st.write("👈 데이터를 새로고침합니다.")
+                margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='#000000', plot_bgcolor='#0
