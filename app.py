@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 # [모듈 사용]
 import market_logic 
 import visitor_logic
+import event_logic # [NEW] 이벤트 로직 추가
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
@@ -45,40 +46,42 @@ st.markdown("""
     .vis-total { color: #E5E7EB; }
     .vis-divider { height: 1px; background-color: #2D3035; margin: 8px 0; }
 
-    /* [NEW] 소셜 링크 박스 스타일 (공통) */
+    /* 소셜 링크 박스 스타일 */
     .social-box {
-        display: flex;
-        align-items: center;
-        background-color: #1C1F26;
-        border: 1px solid #2D3035;
-        border-radius: 12px;
-        padding: 10px 15px;
-        margin-top: 8px; /* 간격 */
-        text-decoration: none !important;
-        transition: all 0.2s ease;
-        cursor: pointer;
+        display: flex; align-items: center; background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 12px; padding: 10px 15px; margin-top: 8px;
+        text-decoration: none !important; transition: all 0.2s ease; cursor: pointer;
     }
-    .social-box:hover {
-        border-color: #10B981;
-        background-color: #252830;
-        transform: translateX(2px);
-    }
-    .social-img {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        margin-right: 12px;
-        border: 2px solid #2D3035;
-        object-fit: cover;
-    }
-    .social-info {
-        display: flex;
-        flex-direction: column;
-    }
+    .social-box:hover { border-color: #10B981; background-color: #252830; transform: translateX(2px); }
+    .social-img { width: 32px; height: 32px; border-radius: 50%; margin-right: 12px; border: 2px solid #2D3035; object-fit: cover; }
+    .social-info { display: flex; flex-direction: column; }
     .social-label { font-size: 10px; color: #9CA3AF; margin-bottom: 0px; line-height: 1.2;}
     .social-name { font-size: 13px; font-weight: 700; color: #FFFFFF; line-height: 1.2;}
-    .social-handle { font-size: 11px; color: #6B7280; }
-
+    
+    /* [NEW] 이벤트 카드 스타일 */
+    .event-card-link { text-decoration: none !important; }
+    .event-card {
+        background-color: #1C1F26;
+        border: 1px solid #2D3035;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 12px;
+        transition: all 0.2s ease;
+        display: block;
+    }
+    .event-card:hover {
+        border-color: #10B981; /* 호버시 초록색 테두리 */
+        background-color: #252830;
+        transform: translateY(-2px);
+    }
+    .event-top { display: flex; align-items: center; margin-bottom: 8px; }
+    .event-badge { 
+        background-color: #004A77; color: #D3E3FD; 
+        font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-right: 10px; 
+    }
+    .event-title { font-size: 18px; font-weight: 700; color: #FFFFFF; }
+    .event-prize { font-size: 15px; color: #10B981; font-weight: 600; margin-bottom: 12px; }
+    .event-bottom { display: flex; justify-content: space-between; font-size: 13px; color: #9CA3AF; border-top: 1px solid #2D3035; padding-top: 10px; }
+    
     /* 메인 컨텐츠 요소 */
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
@@ -129,7 +132,8 @@ with st.sidebar:
     st.markdown("### **Raoni Map**")
     
     st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
-    menu = st.radio(" ", ["트위터 팔로워 맵", "지수 비교 (Indices)"], label_visibility="collapsed")
+    # [NEW] '텔레그램 이벤트' 메뉴 추가
+    menu = st.radio(" ", ["트위터 팔로워 맵", "지수 비교 (Indices)", "텔레그램 이벤트"], label_visibility="collapsed")
     
     st.divider()
     
@@ -148,7 +152,7 @@ with st.sidebar:
     # 방문자 위젯
     visitor_logic.display_visitor_widget(total_visitors, today_visitors)
 
-    # [NEW] 소셜 링크 (트위터 & 텔레그램)
+    # 소셜 링크
     st.markdown("""
         <a href="https://x.com/raonikor" target="_blank" class="social-box">
             <img src="https://unavatar.io/twitter/raonikor" class="social-img">
@@ -255,6 +259,13 @@ if menu == "트위터 팔로워 맵":
 # ==========================================
 elif menu == "지수 비교 (Indices)":
     market_logic.render_market_page()
+
+# ==========================================
+# [PAGE 3] 텔레그램 이벤트 (Telegram Events)
+# ==========================================
+elif menu == "텔레그램 이벤트":
+    # [NEW] 이벤트 페이지 렌더링
+    event_logic.render_event_page(conn)
 
 if is_admin:
     st.divider()
