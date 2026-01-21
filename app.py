@@ -138,43 +138,68 @@ st.markdown("""
 # 3. 데이터 로드 및 방문자 처리
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# [수정된] 방문자수 로직 (디버깅 기능 추가)
 def check_and_update_visitors():
     try:
+        # 1. 시트 읽기 (캐시 끄기)
         v_df = conn.read(worksheet="visitors", ttl=0)
         
-        if v_df.empty or 'total' not in v_df.columns:
+        # [디버깅] 시트가 비었거나 헤더가 틀린 경우 확인
+        if v_df.empty:
+            st.error("❌ 'visitors' 시트가 비어있습니다.")
+            return 0, 0
+        if not {'total', 'today', 'last_date'}.issubset(v_df.columns):
+            st.error(f"❌ 헤더 오류! 현재 헤더: {v_df.columns.tolist()} -> 'total', 'today', 'last_date' 로 맞춰주세요.")
             return 0, 0
             
-        current_total = int(v_df.iloc[0]['total'])
-        current_today = int(v_df.iloc[0]['today'])
-        stored_date = str(v_df.iloc[0]['last_date'])
+        # 2. 값 가져오기 (에러 방지를 위해 강제 형변환)
+        # 2번째 행(index 0)의 데이터를 가져옵니다.
+        try:
+            current_total = int(str(v_df.iloc[0]['total']).replace(',', '').split('.')[0])
+            current_today = int(str(v_df.iloc[0]['today']).replace(',', '').split('.')[0])
+            stored_date = str(v_df.iloc[0]['last_date']).strip()
+        except Exception as e:
+            st.error(f"❌ 데이터 형식 오류: 숫자나 날짜 형식이 맞는지 확인하세요. ({e})")
+            return 0, 0
         
-        # 한국 시간 기준
+        # 3. 날짜 비교 (한국 시간)
         kst = timezone(timedelta(hours=9))
         today_str = datetime.now(kst).strftime("%Y-%m-%d")
         
         need_update = False
+        
+        # 날짜가 바뀌었으면 Today 리셋
         if stored_date != today_str:
             current_today = 0
-            v_df.iloc[0]['today'] = 0
-            v_df.iloc[0]['last_date'] = today_str
+            v_df.at[0, 'today'] = 0
+            v_df.at[0, 'last_date'] = today_str
             need_update = True
         
+        # 4. 카운트 증가 로직 (세션 체크)
+        # "새로고침"하면 세션이 유지되므로 카운트 안 됨 -> 정상
+        # "새 탭/시크릿 모드"면 세션이 없으므로 카운트 됨 -> 정상
         if 'visit_counted' not in st.session_state:
             current_total += 1
             current_today += 1
-            v_df.iloc[0]['total'] = current_total
-            v_df.iloc[0]['today'] = current_today
+            
+            v_df.at[0, 'total'] = current_total
+            v_df.at[0, 'today'] = current_today
             need_update = True
+            
+            # 방문 사실 기록
             st.session_state['visit_counted'] = True
         
+        # 5. 변경사항 저장
         if need_update:
             conn.update(worksheet="visitors", data=v_df)
             
         return current_total, current_today
-    except Exception:
+        
+    except Exception as e:
+        st.error(f"❌ 시스템 오류: {e}")
         return 0, 0
 
+# 함수 실행
 total_visitors, today_visitors = check_and_update_visitors()
 
 @st.cache_data(ttl="30m") 
@@ -320,3 +345,4 @@ if is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 데이터를 새로고침합니다.")
+
