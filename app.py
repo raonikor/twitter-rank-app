@@ -1,18 +1,3 @@
-정확한 분석입니다! 👍
-마우스를 올렸을 때(Hover) 숫자가 제대로 나온다면 **데이터 자체는 정상**입니다. 다만, 트리맵 위에 글씨를 뿌려주는 **`texttemplate` 설정에서 `%{{color}}` 변수가 숫자를 제대로 인식하지 못해 `NAN%` 오류**가 발생하는 현상입니다.
-
-이를 해결하기 위해 `Change` 데이터를 **`custom_data`에 명시적으로 담아서**, 텍스트 템플릿이 색상 변수가 아닌 **실제 데이터 값**을 가져오도록 수정했습니다.
-
-### 🛠️ 수정 포인트
-
-1. **`custom_data=['Change']` 추가:** 등락률 데이터를 차트 안에 확실하게 심어줍니다.
-2. **템플릿 변경:** `%{color:.2f}%` (불안정) → **`%{customdata[0]:.2f}%` (확실함)** 으로 변경했습니다.
-
----
-
-### 📊 NAN% 오류가 완벽 해결된 `app.py`
-
-```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -312,5 +297,3 @@ if is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 데이터를 새로고침합니다.")
-
-```
