@@ -239,4 +239,59 @@ elif menu == "지수 비교 (Indices)":
                 price = row['Price']
                 change = row['Change']
                 
-                color_class = "delta-up" if change >= 0 else "delta
+                color_class = "delta-up" if change >= 0 else "delta-down"
+                arrow = "▲" if change >= 0 else "▼"
+                price_fmt = f"{price:,.2f}"
+                
+                with cols[i]:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-label">{name}</div>
+                        <div class="metric-value">{price_fmt}</div>
+                        <div class="metric-delta {color_class}">{arrow} {change:.2f}%</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
+        st.write("")
+        st.subheader("🗺️ 마켓 트리맵 (Market Treemap)")
+        
+        fig = px.treemap(
+            market_df,
+            path=['Category', 'Name'],
+            values='Price', 
+            color='Change', 
+            color_continuous_scale=['#EF4444', '#1F2937', '#10B981'], 
+            color_continuous_midpoint=0,
+            template="plotly_dark"
+        )
+        
+        fig.update_traces(
+            texttemplate='<b>%{label}</b><br>%{value:,.2f}<br>%{color:.2f}%',
+            textfont=dict(size=24, family="sans-serif", color="white"),
+            textposition="middle center",
+            marker=dict(line=dict(width=3, color='#000000')),
+            root_color="#000000"
+        )
+        
+        fig.update_layout(
+            margin=dict(t=0, l=0, r=0, b=0), 
+            paper_bgcolor='#000000', 
+            plot_bgcolor='#000000', 
+            height=500,
+            font=dict(family="sans-serif"),
+            coloraxis_showscale=False
+        )
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        
+    else:
+        st.error("데이터를 불러오는 중입니다... (잠시 후 다시 시도해주세요)")
+
+if is_admin:
+    st.divider()
+    st.header("🛠️ Admin Dashboard")
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+    with col2: st.write("👈 데이터를 새로고침합니다.")
