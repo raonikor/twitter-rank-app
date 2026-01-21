@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 import yfinance as yf
+from datetime import datetime, timedelta, timezone
 
 # 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵 & 마켓", layout="wide")
@@ -58,54 +59,75 @@ st.markdown("""
         border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); color: #FFFFFF !important;
     }
 
-    /* [NEW] 방문자 카운터 스타일 */
-    .visitor-badge {
+    /* [NEW] 방문자 카운터 스타일 (2줄) */
+    .visitor-box {
         background-color: #1C1F26;
         border: 1px solid #2D3035;
-        border-radius: 20px;
-        padding: 5px 15px;
-        color: #9CA3AF;
-        font-size: 12px;
-        text-align: center;
+        border-radius: 12px;
+        padding: 15px;
         margin-top: 20px;
-        font-family: monospace;
+        text-align: center;
     }
+    .vis-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1px; }
+    .vis-val { font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 5px; font-family: monospace;}
+    .vis-today { color: #10B981; } /* Today는 녹색 */
+    .vis-total { color: #E5E7EB; }
+    .vis-divider { height: 1px; background-color: #2D3035; margin: 8px 0; }
     </style>
     """, unsafe_allow_html=True)
 
 # 3. 데이터 로드 및 방문자 처리
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# [NEW] 방문자수 로직 (세션당 1회만 카운트)
+# [NEW] 방문자수 로직 (일일/누적)
 def check_and_update_visitors():
     try:
         # 1. visitors 시트 읽기 (캐시 없이 즉시 읽기)
         v_df = conn.read(worksheet="visitors", ttl=0)
         
-        if v_df.empty:
-            return 0
+        if v_df.empty or 'total' not in v_df.columns:
+            return 0, 0
             
-        current_count = int(v_df.iloc[0]['count'])
+        current_total = int(v_df.iloc[0]['total'])
+        current_today = int(v_df.iloc[0]['today'])
+        stored_date = str(v_df.iloc[0]['last_date']) # YYYY-MM-DD 형식
         
-        # 2. 세션 상태 확인 (이미 카운트했는지?)
+        # 2. 한국 시간 기준 오늘 날짜 구하기
+        kst = timezone(timedelta(hours=9))
+        today_str = datetime.now(kst).strftime("%Y-%m-%d")
+        
+        # 3. 날짜가 바뀌었는지 확인 (리셋 로직)
+        need_update = False
+        if stored_date != today_str:
+            current_today = 0 # 날짜 바뀌면 투데이 리셋
+            v_df.iloc[0]['today'] = 0
+            v_df.iloc[0]['last_date'] = today_str
+            need_update = True
+        
+        # 4. 세션 상태 확인 (새로운 방문자인가?)
         if 'visit_counted' not in st.session_state:
             # 카운트 증가
-            new_count = current_count + 1
-            v_df.iloc[0]['count'] = new_count
+            current_total += 1
+            current_today += 1
             
-            # 시트에 업데이트
+            v_df.iloc[0]['total'] = current_total
+            v_df.iloc[0]['today'] = current_today
+            need_update = True
+            
+            # 세션에 기록
+            st.session_state['visit_counted'] = True
+        
+        # 5. 변경사항이 있으면 시트에 저장
+        if need_update:
             conn.update(worksheet="visitors", data=v_df)
             
-            # 세션에 기록 (새로고침해도 다시 안 올라가게)
-            st.session_state['visit_counted'] = True
-            return new_count
-        else:
-            return current_count
+        return current_total, current_today
+        
     except Exception:
-        return 0 # 에러나면 0 리턴 (앱 중단 방지)
+        return 0, 0 # 에러나면 0 리턴
 
-# 방문자 수 계산 실행
-total_visitors = check_and_update_visitors()
+# 방문자 수 계산 실행 (Total, Today)
+total_visitors, today_visitors = check_and_update_visitors()
 
 
 @st.cache_data(ttl="30m") 
@@ -158,11 +180,15 @@ with st.sidebar:
         admin_pw = st.text_input("Key", type="password")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
 
-    # [NEW] 방문자 카운터 표시
+    # [NEW] 방문자 카운터 UI (Total / Today 분리)
     st.write("")
     st.markdown(f"""
-        <div class="visitor-badge">
-            👀 Total Visitors: {total_visitors:,}
+        <div class="visitor-box">
+            <div class="vis-label">Today Visitors</div>
+            <div class="vis-val vis-today">+{today_visitors:,}</div>
+            <div class="vis-divider"></div>
+            <div class="vis-label">Total Visitors</div>
+            <div class="vis-val vis-total">{total_visitors:,}</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -296,7 +322,4 @@ if is_admin:
     st.header("🛠️ Admin Dashboard")
     col1, col2 = st.columns([1, 3])
     with col1:
-        if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-    with col2: st.write("👈 데이터를 새로고침합니다.")
+        if st.button("🔄 데이터 동기화 (Sync)", type="primary
