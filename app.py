@@ -15,7 +15,7 @@ st.markdown("""
     /* 전체 배경 */
     .stApp { background-color: #0F1115; color: #FFFFFF; }
     
-    /* 사이드바 스타일 */
+    /* 사이드바 배경 */
     [data-testid="stSidebar"] { 
         background-color: #1E1F20; 
         border-right: 1px solid #333;
@@ -23,7 +23,7 @@ st.markdown("""
     
     /* 사이드바 라디오 버튼 컨테이너 (간격 최소화) */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] {
-        gap: 2px; /* 항목 간 간격 더 줄임 */
+        gap: 2px;
     }
 
     /* 라디오 버튼의 동그라미 숨기기 */
@@ -31,41 +31,53 @@ st.markdown("""
         display: none !important;
     }
 
-    /* 메뉴 항목 디자인 (기본 상태) - 글씨 밝게, 간격 좁게 수정 */
+    /* [기본 상태] 메뉴 항목 디자인 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
         display: flex;
         width: 100%;
-        padding: 6px 12px !important; /* [수정] 위아래 패딩 줄임 (10px -> 6px) */
-        border-radius: 8px !important; /* 모서리 살짝 덜 둥글게 (공간 효율) */
+        padding: 6px 12px !important;
+        border-radius: 8px !important;
         border: none !important;
         background-color: transparent;
-        color: #FFFFFF !important; /* [수정] 글씨색 완전 흰색으로 변경 */
         transition: all 0.2s ease;
-        margin-bottom: 1px; /* [수정] 마진 줄임 */
+        margin-bottom: 1px;
+    }
+
+    /* [기본 상태] 텍스트 색상 (내부 p태그 강제 지정) */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label div,
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label p {
+        color: #B0B3B8 !important; /* 기본은 연한 회색 */
         font-size: 14px;
         font-weight: 500;
-        line-height: 1.4; /* 줄 간격 정리 */
     }
 
-    /* 마우스 올렸을 때 (Hover) */
+    /* [호버 상태] 마우스 올렸을 때 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover {
         background-color: #282A2C !important;
-        color: #FFFFFF !important;
+    }
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover p {
+        color: #FFFFFF !important; /* 호버 시 흰색 */
     }
 
-    /* 선택된 항목 (Active) - 파란색 배경 */
+    /* [선택된 상태] 배경색 변경 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) {
-        background-color: #004A77 !important;
-        color: #FFFFFF !important; /* 선택시 글자도 흰색 유지 */
-        font-weight: 600;
+        background-color: #004A77 !important; /* 제미니 블루 */
     }
 
-    /* 사이드바 헤더 (소제목) 스타일 - 밝게 수정 */
+    /* [선택된 상태] 텍스트 색상 강제 흰색 (가장 중요!) */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) div,
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) p,
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) span {
+        color: #FFFFFF !important;
+        font-weight: 700;
+    }
+
+    /* 사이드바 헤더 (소제목) 스타일 */
     .sidebar-header {
         font-size: 11px;
         font-weight: 700;
-        color: #E0E0E0; /* [수정] 밝은 은색으로 변경 (가독성 UP) */
-        margin-top: 15px; /* 간격 줄임 */
+        color: #E0E0E0;
+        margin-top: 15px;
         margin-bottom: 5px;
         padding-left: 8px;
         text-transform: uppercase;
@@ -197,7 +209,6 @@ def get_market_data():
 
 # 4. 사이드바 구성 (Raoni Map 스타일)
 with st.sidebar:
-    # [수정] 타이틀 변경
     st.markdown("### **Raoni Map**")
     
     st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
