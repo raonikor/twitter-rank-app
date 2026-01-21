@@ -9,11 +9,60 @@ from datetime import datetime, timedelta, timezone
 # 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵 & 마켓", layout="wide")
 
-# 2. CSS 스타일
+# 2. CSS 스타일 (제미니 스타일 사이드바 + 기존 스타일)
 st.markdown("""
     <style>
+    /* 전체 배경 */
     .stApp { background-color: #0F1115; color: #FFFFFF; }
-    [data-testid="stSidebar"] { background-color: #16191E; border-right: 1px solid #2D3035; }
+    
+    /* [NEW] 제미니 스타일 사이드바 CSS */
+    [data-testid="stSidebar"] { 
+        background-color: #1E1F20; /* 제미니 사이드바 배경색 */
+        border-right: 1px solid #333;
+    }
+    
+    /* 사이드바 라디오 버튼 컨테이너 */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] {
+        gap: 4px; /* 항목 간 간격 */
+    }
+
+    /* 라디오 버튼의 동그라미 숨기기 (핵심!) */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label > div:first-child {
+        display: none !important;
+    }
+
+    /* 메뉴 항목 디자인 (기본 상태) */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
+        display: flex;
+        width: 100%;
+        padding: 10px 16px !important;
+        border-radius: 20px !important; /* 제미니 특유의 둥근 모서리 */
+        border: none !important;
+        background-color: transparent;
+        color: #E3E3E3 !important;
+        transition: all 0.2s ease;
+        margin-bottom: 2px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    /* 마우스 올렸을 때 (Hover) */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover {
+        background-color: #282A2C !important; /* 연한 회색 */
+        color: #FFFFFF !important;
+    }
+
+    /* [핵심] 선택된 항목 (Active) - 파란색 배경 */
+    /* :has() 선택자를 사용하여 체크된 input이 있는 label을 스타일링 */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) {
+        background-color: #004A77 !important; /* 제미니 블루 */
+        color: #D3E3FD !important; /* 밝은 텍스트 */
+        font-weight: 600;
+    }
+
+    /* ---------------------------------------------------- */
+    /* 기존 앱 스타일 유지 */
+    /* ---------------------------------------------------- */
     
     /* 상단 요약 카드 */
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
@@ -51,15 +100,7 @@ st.markdown("""
     .js-plotly-plot .plotly .main-svg g.shapelayer path { transition: filter 0.2s ease; cursor: pointer; }
     .js-plotly-plot .plotly .main-svg g.shapelayer path:hover { filter: brightness(1.2) !important; opacity: 1 !important; }
 
-    /* 사이드바 메뉴 */
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
-        background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 12px 15px !important; margin-bottom: 8px; transition: all 0.2s ease; color: #E5E7EB !important;
-    }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover {
-        border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); color: #FFFFFF !important;
-    }
-
-    /* [NEW] 방문자 카운터 스타일 (2줄) */
+    /* 방문자 카운터 스타일 */
     .visitor-box {
         background-color: #1C1F26;
         border: 1px solid #2D3035;
@@ -70,63 +111,61 @@ st.markdown("""
     }
     .vis-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1px; }
     .vis-val { font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 5px; font-family: monospace;}
-    .vis-today { color: #10B981; } /* Today는 녹색 */
+    .vis-today { color: #10B981; }
     .vis-total { color: #E5E7EB; }
     .vis-divider { height: 1px; background-color: #2D3035; margin: 8px 0; }
+    
+    /* 사이드바 헤더 스타일 */
+    .sidebar-header {
+        font-size: 12px;
+        font-weight: 600;
+        color: #9CA3AF;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        padding-left: 10px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # 3. 데이터 로드 및 방문자 처리
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# [NEW] 방문자수 로직 (일일/누적)
+# 방문자수 로직
 def check_and_update_visitors():
     try:
-        # 1. visitors 시트 읽기 (캐시 없이 즉시 읽기)
         v_df = conn.read(worksheet="visitors", ttl=0)
-        
         if v_df.empty or 'total' not in v_df.columns:
             return 0, 0
             
         current_total = int(v_df.iloc[0]['total'])
         current_today = int(v_df.iloc[0]['today'])
-        stored_date = str(v_df.iloc[0]['last_date']) # YYYY-MM-DD 형식
+        stored_date = str(v_df.iloc[0]['last_date'])
         
-        # 2. 한국 시간 기준 오늘 날짜 구하기
         kst = timezone(timedelta(hours=9))
         today_str = datetime.now(kst).strftime("%Y-%m-%d")
         
-        # 3. 날짜가 바뀌었는지 확인 (리셋 로직)
         need_update = False
         if stored_date != today_str:
-            current_today = 0 # 날짜 바뀌면 투데이 리셋
+            current_today = 0
             v_df.iloc[0]['today'] = 0
             v_df.iloc[0]['last_date'] = today_str
             need_update = True
         
-        # 4. 세션 상태 확인 (새로운 방문자인가?)
         if 'visit_counted' not in st.session_state:
-            # 카운트 증가
             current_total += 1
             current_today += 1
-            
             v_df.iloc[0]['total'] = current_total
             v_df.iloc[0]['today'] = current_today
             need_update = True
-            
-            # 세션에 기록
             st.session_state['visit_counted'] = True
         
-        # 5. 변경사항이 있으면 시트에 저장
         if need_update:
             conn.update(worksheet="visitors", data=v_df)
             
         return current_total, current_today
-        
     except Exception:
-        return 0, 0 # 에러나면 0 리턴
+        return 0, 0
 
-# 방문자 수 계산 실행 (Total, Today)
 total_visitors, today_visitors = check_and_update_visitors()
 
 
@@ -160,34 +199,41 @@ def get_market_data():
         except: continue
     return pd.DataFrame(market_df)
 
-# 4. 사이드바 구성
+# 4. 사이드바 구성 (제미니 스타일 적용)
 with st.sidebar:
-    st.markdown("### **NAVIGATION**")
+    # 로고 혹은 앱 이름
+    st.markdown("### **Gemini Map**")
+    
+    st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
+    
+    # 1. 메인 메뉴 (라디오 버튼이지만 버튼처럼 보이게 CSS 적용됨)
     menu = st.radio(" ", ["트위터 팔로워 맵", "지수 비교 (Indices)"], label_visibility="collapsed")
     
     st.divider()
     
     if menu == "트위터 팔로워 맵":
         df = get_sheet_data()
-        st.markdown("### **CATEGORY**")
+        st.markdown('<div class="sidebar-header">카테고리 (CATEGORY)</div>', unsafe_allow_html=True)
+        
         available_cats = ["전체보기"]
         if not df.empty: available_cats.extend(sorted(df['category'].unique().tolist()))
-        selected_category = st.radio(" ", available_cats, label_visibility="collapsed")
+        
+        # 2. 카테고리 메뉴 (역시 버튼처럼 보임)
+        selected_category = st.radio("카테고리 선택", available_cats, label_visibility="collapsed")
     
-    # 관리자 메뉴
-    for _ in range(5): st.write("")
-    with st.expander("⚙️ Admin", expanded=False):
+    # 하단 영역
+    for _ in range(3): st.write("")
+    with st.expander("⚙️ 설정 (Admin)", expanded=False):
         admin_pw = st.text_input("Key", type="password")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
 
-    # [NEW] 방문자 카운터 UI (Total / Today 분리)
-    st.write("")
+    # 방문자 카운터
     st.markdown(f"""
         <div class="visitor-box">
-            <div class="vis-label">Today Visitors</div>
+            <div class="vis-label">Today</div>
             <div class="vis-val vis-today">+{today_visitors:,}</div>
             <div class="vis-divider"></div>
-            <div class="vis-label">Total Visitors</div>
+            <div class="vis-label">Total</div>
             <div class="vis-val vis-total">{total_visitors:,}</div>
         </div>
     """, unsafe_allow_html=True)
