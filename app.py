@@ -45,37 +45,39 @@ st.markdown("""
     .vis-total { color: #E5E7EB; }
     .vis-divider { height: 1px; background-color: #2D3035; margin: 8px 0; }
 
-    /* [NEW] 만든이(Creator) 박스 스타일 */
-    .creator-box {
+    /* [NEW] 소셜 링크 박스 스타일 (공통) */
+    .social-box {
         display: flex;
         align-items: center;
         background-color: #1C1F26;
         border: 1px solid #2D3035;
         border-radius: 12px;
         padding: 10px 15px;
-        margin-top: 10px;
-        text-decoration: none !important; /* 링크 밑줄 제거 */
+        margin-top: 8px; /* 간격 */
+        text-decoration: none !important;
         transition: all 0.2s ease;
         cursor: pointer;
     }
-    .creator-box:hover {
-        border-color: #10B981; /* 호버 시 초록색 테두리 */
+    .social-box:hover {
+        border-color: #10B981;
         background-color: #252830;
+        transform: translateX(2px);
     }
-    .creator-img {
-        width: 38px;
-        height: 38px;
+    .social-img {
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         margin-right: 12px;
         border: 2px solid #2D3035;
+        object-fit: cover;
     }
-    .creator-info {
+    .social-info {
         display: flex;
         flex-direction: column;
     }
-    .creator-label { font-size: 10px; color: #9CA3AF; margin-bottom: 2px; }
-    .creator-name { font-size: 14px; font-weight: 700; color: #FFFFFF; }
-    .creator-handle { font-size: 12px; color: #6B7280; }
+    .social-label { font-size: 10px; color: #9CA3AF; margin-bottom: 0px; line-height: 1.2;}
+    .social-name { font-size: 13px; font-weight: 700; color: #FFFFFF; line-height: 1.2;}
+    .social-handle { font-size: 11px; color: #6B7280; }
 
     /* 메인 컨텐츠 요소 */
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
@@ -143,17 +145,24 @@ with st.sidebar:
         admin_pw = st.text_input("Key", type="password")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
 
-    # [모듈 사용] 방문자 위젯 표시
+    # 방문자 위젯
     visitor_logic.display_visitor_widget(total_visitors, today_visitors)
 
-    # [NEW] 만든이(Creator) 프로필 카드
-    # unavatar.io를 통해 트위터 프로필 사진을 자동으로 가져옵니다.
+    # [NEW] 소셜 링크 (트위터 & 텔레그램)
     st.markdown("""
-        <a href="https://x.com/raonikor" target="_blank" class="creator-box">
-            <img src="https://unavatar.io/twitter/raonikor" class="creator-img">
-            <div class="creator-info">
-                <div class="creator-label">Made by</div>
-                <div class="creator-name">Raoni <span style="font-weight:400; color:#9CA3AF; font-size:12px;">@raonikor</span></div>
+        <a href="https://x.com/raonikor" target="_blank" class="social-box">
+            <img src="https://unavatar.io/twitter/raonikor" class="social-img">
+            <div class="social-info">
+                <div class="social-label">Made by</div>
+                <div class="social-name">Raoni</div>
+            </div>
+        </a>
+        
+        <a href="https://t.me/Raoni1" target="_blank" class="social-box">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" class="social-img" style="padding:2px; background:white;">
+            <div class="social-info">
+                <div class="social-label">Contact</div>
+                <div class="social-name">Telegram</div>
             </div>
         </a>
     """, unsafe_allow_html=True)
@@ -245,7 +254,6 @@ if menu == "트위터 팔로워 맵":
 # [PAGE 2] 지수 비교 (Indices)
 # ==========================================
 elif menu == "지수 비교 (Indices)":
-    # [모듈 사용] 화면 그리기
     market_logic.render_market_page()
 
 if is_admin:
