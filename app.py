@@ -22,7 +22,7 @@ st.markdown("""
     .delta-up { color: #10B981; }
     .delta-down { color: #EF4444; }
     
-    /* 리더보드 리스트 스타일 (슬림) */
+    /* 리더보드 리스트 스타일 */
     .ranking-row { 
         display: flex; align-items: center; justify-content: space-between; 
         background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
@@ -57,11 +57,56 @@ st.markdown("""
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover {
         border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); color: #FFFFFF !important;
     }
+
+    /* [NEW] 방문자 카운터 스타일 */
+    .visitor-badge {
+        background-color: #1C1F26;
+        border: 1px solid #2D3035;
+        border-radius: 20px;
+        padding: 5px 15px;
+        color: #9CA3AF;
+        font-size: 12px;
+        text-align: center;
+        margin-top: 20px;
+        font-family: monospace;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 로드 함수들
+# 3. 데이터 로드 및 방문자 처리
 conn = st.connection("gsheets", type=GSheetsConnection)
+
+# [NEW] 방문자수 로직 (세션당 1회만 카운트)
+def check_and_update_visitors():
+    try:
+        # 1. visitors 시트 읽기 (캐시 없이 즉시 읽기)
+        v_df = conn.read(worksheet="visitors", ttl=0)
+        
+        if v_df.empty:
+            return 0
+            
+        current_count = int(v_df.iloc[0]['count'])
+        
+        # 2. 세션 상태 확인 (이미 카운트했는지?)
+        if 'visit_counted' not in st.session_state:
+            # 카운트 증가
+            new_count = current_count + 1
+            v_df.iloc[0]['count'] = new_count
+            
+            # 시트에 업데이트
+            conn.update(worksheet="visitors", data=v_df)
+            
+            # 세션에 기록 (새로고침해도 다시 안 올라가게)
+            st.session_state['visit_counted'] = True
+            return new_count
+        else:
+            return current_count
+    except Exception:
+        return 0 # 에러나면 0 리턴 (앱 중단 방지)
+
+# 방문자 수 계산 실행
+total_visitors = check_and_update_visitors()
+
 
 @st.cache_data(ttl="30m") 
 def get_sheet_data():
@@ -78,40 +123,19 @@ def get_sheet_data():
 
 @st.cache_data(ttl="5m") 
 def get_market_data():
-    tickers = {
-        'KOSPI': '^KS11', 
-        'Gold': 'GC=F',
-        'Ethereum': 'ETH-USD'
-    }
+    tickers = {'KOSPI': '^KS11', 'Gold': 'GC=F', 'Ethereum': 'ETH-USD'}
     market_df = []
-    
     for name, ticker in tickers.items():
         try:
             stock = yf.Ticker(ticker)
             hist = stock.history(period="7d")
-            
             hist = hist.dropna(subset=['Close'])
-            
             if len(hist) >= 2: 
                 current_price = hist['Close'].iloc[-1]
                 prev_price = hist['Close'].iloc[-2]
-                
-                if prev_price == 0 or pd.isna(prev_price) or pd.isna(current_price):
-                    change_pct = 0.0
-                else:
-                    change_pct = ((current_price - prev_price) / prev_price) * 100
-                
-                if pd.isna(change_pct): change_pct = 0.0
-                
-                market_df.append({
-                    'Name': name,
-                    'Price': current_price,
-                    'Change': change_pct,
-                    'Category': 'Major Asset'
-                })
-        except Exception:
-            continue
-            
+                change_pct = ((current_price - prev_price) / prev_price) * 100 if prev_price != 0 else 0
+                market_df.append({'Name': name, 'Price': current_price, 'Change': change_pct, 'Category': 'Major Asset'})
+        except: continue
     return pd.DataFrame(market_df)
 
 # 4. 사이드바 구성
@@ -128,10 +152,19 @@ with st.sidebar:
         if not df.empty: available_cats.extend(sorted(df['category'].unique().tolist()))
         selected_category = st.radio(" ", available_cats, label_visibility="collapsed")
     
-    for _ in range(10): st.write("")
+    # 관리자 메뉴
+    for _ in range(5): st.write("")
     with st.expander("⚙️ Admin", expanded=False):
         admin_pw = st.text_input("Key", type="password")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
+
+    # [NEW] 방문자 카운터 표시
+    st.write("")
+    st.markdown(f"""
+        <div class="visitor-badge">
+            👀 Total Visitors: {total_visitors:,}
+        </div>
+    """, unsafe_allow_html=True)
 
 # ==========================================
 # [PAGE 1] 트위터 팔로워 맵
@@ -227,60 +260,36 @@ elif menu == "지수 비교 (Indices)":
     if not market_df.empty:
         col1, col2, col3 = st.columns(3)
         cols = [col1, col2, col3]
-        
         for i, row in market_df.iterrows():
             if i < 3:
-                name = row['Name']
-                price = row['Price']
-                change = row['Change']
-                
+                name, price, change = row['Name'], row['Price'], row['Change']
                 color_class = "delta-up" if change >= 0 else "delta-down"
                 arrow = "▲" if change >= 0 else "▼"
-                price_fmt = f"{price:,.2f}"
-                
                 with cols[i]:
                     st.markdown(f"""
                     <div class="metric-card">
                         <div class="metric-label">{name}</div>
-                        <div class="metric-value">{price_fmt}</div>
+                        <div class="metric-value">{price:,.2f}</div>
                         <div class="metric-delta {color_class}">{arrow} {change:.2f}%</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    </div>""", unsafe_allow_html=True)
         
         st.write("")
-        # [삭제] st.subheader("🗺️ 마켓 트리맵 (Market Treemap)") 코드 제거됨
-        
         fig = px.treemap(
-            market_df,
-            path=['Category', 'Name'],
-            values='Price', 
-            color='Change', 
-            custom_data=['Change'], 
-            color_continuous_scale=['#EF4444', '#1F2937', '#10B981'], 
-            color_continuous_midpoint=0,
-            template="plotly_dark"
+            market_df, path=['Category', 'Name'], values='Price', color='Change', 
+            custom_data=['Change'], color_continuous_scale=['#EF4444', '#1F2937', '#10B981'], 
+            color_continuous_midpoint=0, template="plotly_dark"
         )
-        
         fig.update_traces(
             texttemplate='<b>%{label}</b><br>%{value:,.2f}<br>%{customdata[0]:.2f}%',
             textfont=dict(size=24, family="sans-serif", color="white"),
-            textposition="middle center",
-            marker=dict(line=dict(width=3, color='#000000')),
-            root_color="#000000"
+            textposition="middle center", marker=dict(line=dict(width=3, color='#000000')), root_color="#000000"
         )
-        
         fig.update_layout(
-            margin=dict(t=0, l=0, r=0, b=0), 
-            paper_bgcolor='#000000', 
-            plot_bgcolor='#000000', 
-            height=500,
-            font=dict(family="sans-serif"),
-            coloraxis_showscale=False
+            margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='#000000', plot_bgcolor='#000000', height=500,
+            font=dict(family="sans-serif"), coloraxis_showscale=False
         )
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-        
-    else:
-        st.error("데이터를 불러오는 중입니다... (잠시 후 다시 시도해주세요)")
+    else: st.error("데이터 로딩 중...")
 
 if is_admin:
     st.divider()
