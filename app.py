@@ -1,19 +1,3 @@
-죄송합니다! 제가 "복사해서 한 번에 실행하기 편하시도록" 합쳐드린다는 게, 오히려 **모듈화(분리) 하려던 의도를 거스르고 다시 코드를 섞어버렸네요.** 😅
-
-사용자님의 의도대로 **`market_logic.py`로 지수 비교 기능을 깔끔하게 분리한 버전**의 최종 **`app.py`** 코드를 드립니다.
-
-이 코드는 **`market_logic.py` 파일이 같은 폴더에 있어야** 작동합니다.
-
-### 📂 파일 구조 확인
-
-* `market_logic.py` (아까 만드신 파일 그대로 두시면 됩니다)
-* `app.py` (아래 코드로 덮어쓰세요)
-
----
-
-### 🏆 최종 `app.py` (모듈화 적용됨)
-
-```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -344,5 +328,3 @@ if is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 데이터를 새로고침합니다.")
-
-```
