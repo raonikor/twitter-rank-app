@@ -63,7 +63,7 @@ st.markdown("""
 # 3. 데이터 로드 함수들
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-@st.cache_data(ttl="30m") # 구글 시트 데이터 캐싱
+@st.cache_data(ttl="30m") 
 def get_sheet_data():
     try:
         df = conn.read(ttl="0") 
@@ -76,26 +76,23 @@ def get_sheet_data():
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category'])
 
-@st.cache_data(ttl="5m") # [NEW] 주가 데이터 캐싱
+@st.cache_data(ttl="5m") 
 def get_market_data():
-    # [수정] 종목 리스트 확장 (KOSPI 포함)
+    # [핵심 수정] 딱 3개만 남김
     tickers = {
         'KOSPI': '^KS11', 
-        'S&P 500': '^GSPC', 
-        'NASDAQ': '^IXIC', 
-        'Bitcoin': 'BTC-USD',
-        'Ethereum': 'ETH-USD',
-        'Gold': 'GC=F'
+        'Gold': 'GC=F',
+        'Ethereum': 'ETH-USD'
     }
     market_df = []
     
     for name, ticker in tickers.items():
         try:
-            # [핵심 수정] 기간을 5d(5일)로 늘려서 휴일/주말에도 데이터 확보 보장
+            # 5일치 데이터를 가져와 안정적으로 등락률 계산
             stock = yf.Ticker(ticker)
             hist = stock.history(period="5d")
             
-            if len(hist) >= 2: # 최소 2일치 데이터가 있어야 등락 계산 가능
+            if len(hist) >= 2: 
                 current_price = hist['Close'].iloc[-1]
                 prev_price = hist['Close'].iloc[-2]
                 change_pct = ((current_price - prev_price) / prev_price) * 100
@@ -104,10 +101,10 @@ def get_market_data():
                     'Name': name,
                     'Price': current_price,
                     'Change': change_pct,
-                    'Category': 'Crypto' if 'USD' in ticker else 'Index/Gold'
+                    'Category': 'Major Asset' # 카테고리 통일
                 })
         except Exception:
-            continue # 에러 나면 해당 종목만 스킵
+            continue
             
     return pd.DataFrame(market_df)
 
@@ -216,25 +213,22 @@ if menu == "트위터 팔로워 맵":
 # [PAGE 2] 지수 비교 (Market Indices)
 # ==========================================
 elif menu == "지수 비교 (Indices)":
-    st.title("📊 글로벌 시장 지수")
-    st.caption("Real-time Market Data (KOSPI, S&P500, Crypto, Gold)")
+    st.title("📊 시장 지수 (Market Indices)")
+    st.caption("Real-time Data: KOSPI, Gold, Ethereum")
     
     market_df = get_market_data()
     
     if not market_df.empty:
-        # 1. 상단 메트릭 카드 (주요 지수 3개 표시)
+        # 1. 3개의 메트릭 카드 표시
         col1, col2, col3 = st.columns(3)
         cols = [col1, col2, col3]
         
-        # 표시할 우선순위 리스트
-        top_indices = ['KOSPI', 'Bitcoin', 'Gold']
-        
-        for i, idx_name in enumerate(top_indices):
-            # 해당 이름의 데이터를 찾음
-            row = market_df[market_df['Name'] == idx_name]
-            if not row.empty:
-                price = row['Price'].values[0]
-                change = row['Change'].values[0]
+        # 순서대로 3개만 있으므로 그대로 출력
+        for i, row in market_df.iterrows():
+            if i < 3: # 안전장치
+                name = row['Name']
+                price = row['Price']
+                change = row['Change']
                 
                 color_class = "delta-up" if change >= 0 else "delta-down"
                 arrow = "▲" if change >= 0 else "▼"
@@ -243,7 +237,7 @@ elif menu == "지수 비교 (Indices)":
                 with cols[i]:
                     st.markdown(f"""
                     <div class="metric-card">
-                        <div class="metric-label">{idx_name}</div>
+                        <div class="metric-label">{name}</div>
                         <div class="metric-value">{price_fmt}</div>
                         <div class="metric-delta {color_class}">{arrow} {change:.2f}%</div>
                     </div>
