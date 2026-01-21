@@ -1,3 +1,18 @@
+정확한 분석입니다! 👍
+마우스를 올렸을 때(Hover) 숫자가 제대로 나온다면 **데이터 자체는 정상**입니다. 다만, 트리맵 위에 글씨를 뿌려주는 **`texttemplate` 설정에서 `%{{color}}` 변수가 숫자를 제대로 인식하지 못해 `NAN%` 오류**가 발생하는 현상입니다.
+
+이를 해결하기 위해 `Change` 데이터를 **`custom_data`에 명시적으로 담아서**, 텍스트 템플릿이 색상 변수가 아닌 **실제 데이터 값**을 가져오도록 수정했습니다.
+
+### 🛠️ 수정 포인트
+
+1. **`custom_data=['Change']` 추가:** 등락률 데이터를 차트 안에 확실하게 심어줍니다.
+2. **템플릿 변경:** `%{color:.2f}%` (불안정) → **`%{customdata[0]:.2f}%` (확실함)** 으로 변경했습니다.
+
+---
+
+### 📊 NAN% 오류가 완벽 해결된 `app.py`
+
+```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -88,25 +103,24 @@ def get_market_data():
     for name, ticker in tickers.items():
         try:
             stock = yf.Ticker(ticker)
-            # 기간을 7일로 넉넉히 잡음
+            # 기간을 7일로 잡음
             hist = stock.history(period="7d")
             
-            # [핵심 수정 1] 결측치(NaN)가 있는 행은 아예 제거
+            # 결측치(NaN)가 있는 행 제거
             hist = hist.dropna(subset=['Close'])
             
             if len(hist) >= 2: 
                 current_price = hist['Close'].iloc[-1]
                 prev_price = hist['Close'].iloc[-2]
                 
-                # [핵심 수정 2] 0으로 나누기 방지 및 NaN 체크
+                # 안전한 변동률 계산
                 if prev_price == 0 or pd.isna(prev_price) or pd.isna(current_price):
                     change_pct = 0.0
                 else:
                     change_pct = ((current_price - prev_price) / prev_price) * 100
                 
-                # [핵심 수정 3] 최종 결과가 NaN이면 0.0으로 대체
-                if pd.isna(change_pct):
-                    change_pct = 0.0
+                # 최종 NaN 체크
+                if pd.isna(change_pct): change_pct = 0.0
                 
                 market_df.append({
                     'Name': name,
@@ -255,18 +269,21 @@ elif menu == "지수 비교 (Indices)":
         st.write("")
         st.subheader("🗺️ 마켓 트리맵 (Market Treemap)")
         
+        # [핵심 수정] custom_data에 'Change' 컬럼을 추가
         fig = px.treemap(
             market_df,
             path=['Category', 'Name'],
             values='Price', 
             color='Change', 
+            custom_data=['Change'], # 데이터를 명시적으로 넘김
             color_continuous_scale=['#EF4444', '#1F2937', '#10B981'], 
             color_continuous_midpoint=0,
             template="plotly_dark"
         )
         
+        # [핵심 수정] %{color} 대신 %{customdata[0]} 사용
         fig.update_traces(
-            texttemplate='<b>%{label}</b><br>%{value:,.2f}<br>%{color:.2f}%',
+            texttemplate='<b>%{label}</b><br>%{value:,.2f}<br>%{customdata[0]:.2f}%',
             textfont=dict(size=24, family="sans-serif", color="white"),
             textposition="middle center",
             marker=dict(line=dict(width=3, color='#000000')),
@@ -295,3 +312,5 @@ if is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 데이터를 새로고침합니다.")
+
+```
