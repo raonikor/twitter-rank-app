@@ -1,3 +1,19 @@
+죄송합니다! 제가 "복사해서 한 번에 실행하기 편하시도록" 합쳐드린다는 게, 오히려 **모듈화(분리) 하려던 의도를 거스르고 다시 코드를 섞어버렸네요.** 😅
+
+사용자님의 의도대로 **`market_logic.py`로 지수 비교 기능을 깔끔하게 분리한 버전**의 최종 **`app.py`** 코드를 드립니다.
+
+이 코드는 **`market_logic.py` 파일이 같은 폴더에 있어야** 작동합니다.
+
+### 📂 파일 구조 확인
+
+* `market_logic.py` (아까 만드신 파일 그대로 두시면 됩니다)
+* `app.py` (아래 코드로 덮어쓰세요)
+
+---
+
+### 🏆 최종 `app.py` (모듈화 적용됨)
+
+```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -127,4 +143,206 @@ st.markdown("""
         text-align: center;
     }
     .vis-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1px; }
-    .vis-val { font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 5px; font-family
+    .vis-val { font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 5px; font-family: monospace;}
+    .vis-today { color: #10B981; }
+    .vis-total { color: #E5E7EB; }
+    .vis-divider { height: 1px; background-color: #2D3035; margin: 8px 0; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 3. 데이터 로드 및 방문자 처리
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# 방문자수 로직 (디버깅 기능 포함)
+def check_and_update_visitors():
+    try:
+        v_df = conn.read(worksheet="visitors", ttl=0)
+        
+        if v_df.empty:
+            st.sidebar.error("❌ 'visitors' 시트가 비어있습니다.")
+            return 0, 0
+        
+        required_cols = {'total', 'today', 'last_date'}
+        if not required_cols.issubset(v_df.columns):
+            st.sidebar.error(f"❌ 헤더 오류! 필요: {required_cols}")
+            return 0, 0
+            
+        try:
+            current_total = int(str(v_df.iloc[0]['total']).replace(',', '').split('.')[0])
+            current_today = int(str(v_df.iloc[0]['today']).replace(',', '').split('.')[0])
+            stored_date = str(v_df.iloc[0]['last_date']).strip()
+        except Exception as e:
+            st.sidebar.error(f"❌ 데이터 형식 오류: {e}")
+            return 0, 0
+        
+        kst = timezone(timedelta(hours=9))
+        today_str = datetime.now(kst).strftime("%Y-%m-%d")
+        
+        need_update = False
+        if stored_date != today_str:
+            current_today = 0
+            v_df.at[0, 'today'] = 0
+            v_df.at[0, 'last_date'] = today_str
+            need_update = True
+        
+        if 'visit_counted' not in st.session_state:
+            current_total += 1
+            current_today += 1
+            v_df.at[0, 'total'] = current_total
+            v_df.at[0, 'today'] = current_today
+            need_update = True
+            st.session_state['visit_counted'] = True
+        
+        if need_update:
+            conn.update(worksheet="visitors", data=v_df)
+            
+        return current_total, current_today
+    except Exception as e:
+        return 0, 0
+
+total_visitors, today_visitors = check_and_update_visitors()
+
+@st.cache_data(ttl="30m") 
+def get_sheet_data():
+    try:
+        df = conn.read(ttl="0") 
+        if df is not None and not df.empty:
+            df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
+            df['category'] = df['category'].fillna('미분류') if 'category' in df.columns else '미분류'
+            df['handle'] = df['handle'].astype(str)
+            if 'name' not in df.columns: df['name'] = df['handle'] 
+            else: df['name'] = df['name'].fillna(df['handle'])
+        return df
+    except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category'])
+
+# 4. 사이드바 구성 (Raoni Map 스타일)
+with st.sidebar:
+    st.markdown("### **Raoni Map**")
+    
+    st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
+    menu = st.radio(" ", ["트위터 팔로워 맵", "지수 비교 (Indices)"], label_visibility="collapsed")
+    
+    st.divider()
+    
+    if menu == "트위터 팔로워 맵":
+        df = get_sheet_data()
+        st.markdown('<div class="sidebar-header">카테고리 (CATEGORY)</div>', unsafe_allow_html=True)
+        available_cats = ["전체보기"]
+        if not df.empty: available_cats.extend(sorted(df['category'].unique().tolist()))
+        selected_category = st.radio("카테고리 선택", available_cats, label_visibility="collapsed")
+    
+    for _ in range(3): st.write("")
+    with st.expander("⚙️ 설정 (Admin)", expanded=False):
+        admin_pw = st.text_input("Key", type="password")
+        is_admin = (admin_pw == st.secrets["ADMIN_PW"])
+
+    st.markdown(f"""
+        <div class="visitor-box">
+            <div class="vis-label">Today</div>
+            <div class="vis-val vis-today">+{today_visitors:,}</div>
+            <div class="vis-divider"></div>
+            <div class="vis-label">Total</div>
+            <div class="vis-val vis-total">{total_visitors:,}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+# ==========================================
+# [PAGE 1] 트위터 팔로워 맵
+# ==========================================
+if menu == "트위터 팔로워 맵":
+    st.title(f"트위터 팔로워 맵") 
+    st.caption(f"Twitter Follower Map - {selected_category}")
+
+    if not df.empty:
+        if selected_category == "전체보기": display_df = df[df['followers'] > 0]
+        else: display_df = df[(df['category'] == selected_category) & (df['followers'] > 0)]
+
+        col1, col2, col3 = st.columns(3)
+        total_acc = len(display_df)
+        total_fol = display_df['followers'].sum()
+        top_one = display_df.loc[display_df['followers'].idxmax()] if not display_df.empty else None
+        top_one_text = f"{top_one['name']}" if top_one is not None else "-"
+
+        with col1: st.markdown(f'<div class="metric-card"><div class="metric-label">전체 계정</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
+        with col2: st.markdown(f'<div class="metric-card"><div class="metric-label">총 팔로워</div><div class="metric-value">{total_fol:,.0f}</div></div>', unsafe_allow_html=True)
+        with col3: st.markdown(f'<div class="metric-card"><div class="metric-label">최고 영향력</div><div class="metric-value" style="font-size:20px;">{top_one_text}</div></div>', unsafe_allow_html=True)
+        
+        st.write("")
+
+        if not display_df.empty:
+            display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
+            display_df['chart_label'] = display_df['name'] + "<br><span style='font-size:0.7em; font-weight:normal;'>@" + display_df['handle'] + "</span>"
+
+            fig = px.treemap(
+                display_df, 
+                path=['category', 'chart_label'], 
+                values='followers', 
+                color='log_followers',
+                custom_data=['name'], 
+                color_continuous_scale=[(0.00, '#2E2B4E'), (0.05, '#353263'), (0.10, '#3F3C5C'), (0.15, '#464282'), (0.20, '#4A477A'), (0.25, '#4A5D91'), (0.30, '#4A6FA5'), (0.35, '#537CA8'), (0.40, '#5C8BAE'), (0.45, '#5C98AE'), (0.50, '#5E9CA8'), (0.55, '#5E9E94'), (0.60, '#5F9E7F'), (0.65, '#729E6F'), (0.70, '#859E5F'), (0.75, '#969E5F'), (0.80, '#A89E5F'), (0.85, '#AD905D'), (0.90, '#AE815C'), (0.95, '#AE6E5C'), (1.00, '#AE5C5C')],
+                template="plotly_dark"
+            )
+            
+            fig.update_traces(
+                texttemplate='<b>%{customdata[0]}</b><br><b style="font-size:1.2em">%{value:,.0f}</b><br><span style="font-size:0.8em; color:#D1D5DB">%{percentRoot:.1%}</span>',
+                textfont=dict(size=20, family="sans-serif", color="white"),
+                textposition="middle center",
+                marker=dict(line=dict(width=3, color='#000000')), 
+                root_color="#000000",
+                hovertemplate='<b>%{customdata[0]}</b><br><span style="color:#9CA3AF">@%{label}</span><br>Followers: %{value:,.0f}<br>Share: %{percentRoot:.1%}<extra></extra>'
+            )
+            
+            fig.update_layout(
+                margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='#000000', plot_bgcolor='#000000', height=600, 
+                font=dict(family="sans-serif"), coloraxis_showscale=False,
+                hoverlabel=dict(bgcolor="#1C1F26", bordercolor="#10B981", font=dict(size=18, color="white"), namelength=-1)
+            )
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+            st.write("")
+            st.subheader("🏆 팔로워 순위 (Leaderboard)")
+            
+            ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
+            view_total = ranking_df['followers'].sum()
+            
+            list_html = ""
+            for index, row in ranking_df.iterrows():
+                rank = index + 1
+                medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
+                img_url = f"https://unavatar.io/twitter/{row['handle']}"
+                share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
+                
+                list_html += f"""
+                <div class="ranking-row">
+                    <div class="rank-num">{medal}</div>
+                    <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
+                    <div class="rank-info">
+                        <div class="rank-name">{row['name']}</div>
+                        <div class="rank-handle">@{row['handle']}</div>
+                    </div>
+                    <div class="rank-category">{row['category']}</div>
+                    <div class="rank-share">{share_pct:.1f}%</div>
+                    <div class="rank-followers">{int(row['followers']):,}</div>
+                </div>
+                """
+            with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
+    else: st.info("데이터가 없습니다.")
+
+# ==========================================
+# [PAGE 2] 지수 비교 (Indices)
+# ==========================================
+elif menu == "지수 비교 (Indices)":
+    # 분리된 모듈 사용
+    market_logic.render_market_page()
+
+if is_admin:
+    st.divider()
+    st.header("🛠️ Admin Dashboard")
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+    with col2: st.write("👈 데이터를 새로고침합니다.")
+
+```
