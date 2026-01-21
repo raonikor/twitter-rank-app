@@ -78,7 +78,6 @@ def get_sheet_data():
 
 @st.cache_data(ttl="5m") 
 def get_market_data():
-    # [핵심 수정] 딱 3개만 남김
     tickers = {
         'KOSPI': '^KS11', 
         'Gold': 'GC=F',
@@ -88,20 +87,32 @@ def get_market_data():
     
     for name, ticker in tickers.items():
         try:
-            # 5일치 데이터를 가져와 안정적으로 등락률 계산
             stock = yf.Ticker(ticker)
-            hist = stock.history(period="5d")
+            # 기간을 7일로 넉넉히 잡음
+            hist = stock.history(period="7d")
+            
+            # [핵심 수정 1] 결측치(NaN)가 있는 행은 아예 제거
+            hist = hist.dropna(subset=['Close'])
             
             if len(hist) >= 2: 
                 current_price = hist['Close'].iloc[-1]
                 prev_price = hist['Close'].iloc[-2]
-                change_pct = ((current_price - prev_price) / prev_price) * 100
+                
+                # [핵심 수정 2] 0으로 나누기 방지 및 NaN 체크
+                if prev_price == 0 or pd.isna(prev_price) or pd.isna(current_price):
+                    change_pct = 0.0
+                else:
+                    change_pct = ((current_price - prev_price) / prev_price) * 100
+                
+                # [핵심 수정 3] 최종 결과가 NaN이면 0.0으로 대체
+                if pd.isna(change_pct):
+                    change_pct = 0.0
                 
                 market_df.append({
                     'Name': name,
                     'Price': current_price,
                     'Change': change_pct,
-                    'Category': 'Major Asset' # 카테고리 통일
+                    'Category': 'Major Asset'
                 })
         except Exception:
             continue
@@ -219,72 +230,13 @@ elif menu == "지수 비교 (Indices)":
     market_df = get_market_data()
     
     if not market_df.empty:
-        # 1. 3개의 메트릭 카드 표시
         col1, col2, col3 = st.columns(3)
         cols = [col1, col2, col3]
         
-        # 순서대로 3개만 있으므로 그대로 출력
         for i, row in market_df.iterrows():
-            if i < 3: # 안전장치
+            if i < 3:
                 name = row['Name']
                 price = row['Price']
                 change = row['Change']
                 
-                color_class = "delta-up" if change >= 0 else "delta-down"
-                arrow = "▲" if change >= 0 else "▼"
-                price_fmt = f"{price:,.2f}"
-                
-                with cols[i]:
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <div class="metric-label">{name}</div>
-                        <div class="metric-value">{price_fmt}</div>
-                        <div class="metric-delta {color_class}">{arrow} {change:.2f}%</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-        
-        st.write("")
-        st.subheader("🗺️ 마켓 트리맵 (Market Treemap)")
-        
-        # 2. 트리맵 (등락률 시각화)
-        fig = px.treemap(
-            market_df,
-            path=['Category', 'Name'],
-            values='Price', 
-            color='Change', 
-            color_continuous_scale=['#EF4444', '#1F2937', '#10B981'], # Red -> Dark -> Green
-            color_continuous_midpoint=0,
-            template="plotly_dark"
-        )
-        
-        fig.update_traces(
-            texttemplate='<b>%{label}</b><br>%{value:,.2f}<br>%{color:.2f}%',
-            textfont=dict(size=24, family="sans-serif", color="white"),
-            textposition="middle center",
-            marker=dict(line=dict(width=3, color='#000000')),
-            root_color="#000000"
-        )
-        
-        fig.update_layout(
-            margin=dict(t=0, l=0, r=0, b=0), 
-            paper_bgcolor='#000000', 
-            plot_bgcolor='#000000', 
-            height=500,
-            font=dict(family="sans-serif"),
-            coloraxis_showscale=False
-        )
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-        
-    else:
-        st.error("데이터를 불러오는 중입니다... (잠시 후 다시 시도해주세요)")
-
-# 관리자 동기화 버튼 (공통)
-if is_admin:
-    st.divider()
-    st.header("🛠️ Admin Dashboard")
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-    with col2: st.write("👈 데이터를 새로고침합니다.")
+                color_class = "delta-up" if change >= 0 else "delta
