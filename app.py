@@ -3,7 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 import numpy as np
-import yfinance as yf  # [NEW] 주가 데이터 라이브러리
+import yfinance as yf
 
 # 1. 페이지 설정
 st.set_page_config(page_title="트위터 팔로워 맵 & 마켓", layout="wide")
@@ -76,43 +76,48 @@ def get_sheet_data():
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category'])
 
-@st.cache_data(ttl="5m") # [NEW] 주가 데이터 캐싱 (5분 주기)
+@st.cache_data(ttl="5m") # [NEW] 주가 데이터 캐싱
 def get_market_data():
-    # KOSPI(^KS11), Gold(GC=F), Ethereum(ETH-USD)
-    tickers = {'KOSPI': '^KS11', 'GOLD': 'GC=F', 'ETH': 'ETH-USD'}
+    # [수정] 종목 리스트 확장 (KOSPI 포함)
+    tickers = {
+        'KOSPI': '^KS11', 
+        'S&P 500': '^GSPC', 
+        'NASDAQ': '^IXIC', 
+        'Bitcoin': 'BTC-USD',
+        'Ethereum': 'ETH-USD',
+        'Gold': 'GC=F'
+    }
     market_df = []
     
     for name, ticker in tickers.items():
         try:
-            # 최근 2일치 데이터 가져와서 변동률 계산
+            # [핵심 수정] 기간을 5d(5일)로 늘려서 휴일/주말에도 데이터 확보 보장
             stock = yf.Ticker(ticker)
-            hist = stock.history(period="2d")
+            hist = stock.history(period="5d")
             
-            if len(hist) >= 1:
+            if len(hist) >= 2: # 최소 2일치 데이터가 있어야 등락 계산 가능
                 current_price = hist['Close'].iloc[-1]
-                prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+                prev_price = hist['Close'].iloc[-2]
                 change_pct = ((current_price - prev_price) / prev_price) * 100
                 
                 market_df.append({
                     'Name': name,
                     'Price': current_price,
                     'Change': change_pct,
-                    'Category': 'Market'
+                    'Category': 'Crypto' if 'USD' in ticker else 'Index/Gold'
                 })
-        except:
-            continue
+        except Exception:
+            continue # 에러 나면 해당 종목만 스킵
             
     return pd.DataFrame(market_df)
 
 # 4. 사이드바 구성
 with st.sidebar:
     st.markdown("### **NAVIGATION**")
-    # [NEW] 탭 선택 메뉴
     menu = st.radio(" ", ["트위터 팔로워 맵", "지수 비교 (Indices)"], label_visibility="collapsed")
     
     st.divider()
     
-    # 트위터 맵일 때만 카테고리 필터 표시
     if menu == "트위터 팔로워 맵":
         df = get_sheet_data()
         st.markdown("### **CATEGORY**")
@@ -211,32 +216,34 @@ if menu == "트위터 팔로워 맵":
 # [PAGE 2] 지수 비교 (Market Indices)
 # ==========================================
 elif menu == "지수 비교 (Indices)":
-    st.title("📊 주요 시장 지수")
-    st.caption("Real-time Market Data (KOSPI, GOLD, ETH)")
+    st.title("📊 글로벌 시장 지수")
+    st.caption("Real-time Market Data (KOSPI, S&P500, Crypto, Gold)")
     
     market_df = get_market_data()
     
     if not market_df.empty:
-        # 1. 상단 메트릭 카드 표시
+        # 1. 상단 메트릭 카드 (주요 지수 3개 표시)
         col1, col2, col3 = st.columns(3)
         cols = [col1, col2, col3]
         
-        for idx, row in market_df.iterrows():
-            if idx < 3:
-                name = row['Name']
-                price = row['Price']
-                change = row['Change']
+        # 표시할 우선순위 리스트
+        top_indices = ['KOSPI', 'Bitcoin', 'Gold']
+        
+        for i, idx_name in enumerate(top_indices):
+            # 해당 이름의 데이터를 찾음
+            row = market_df[market_df['Name'] == idx_name]
+            if not row.empty:
+                price = row['Price'].values[0]
+                change = row['Change'].values[0]
                 
                 color_class = "delta-up" if change >= 0 else "delta-down"
                 arrow = "▲" if change >= 0 else "▼"
-                
-                # 포맷팅 (ETH/GOLD는 소수점, 코스피는 정수)
                 price_fmt = f"{price:,.2f}"
                 
-                with cols[idx]:
+                with cols[i]:
                     st.markdown(f"""
                     <div class="metric-card">
-                        <div class="metric-label">{name}</div>
+                        <div class="metric-label">{idx_name}</div>
                         <div class="metric-value">{price_fmt}</div>
                         <div class="metric-delta {color_class}">{arrow} {change:.2f}%</div>
                     </div>
@@ -245,21 +252,19 @@ elif menu == "지수 비교 (Indices)":
         st.write("")
         st.subheader("🗺️ 마켓 트리맵 (Market Treemap)")
         
-        # 2. 트리맵 시각화 (등락률에 따른 색상)
-        # 등락률이 0보다 크면 초록(상승), 작으면 빨강(하락) -> 일반적인 금융 차트 컬러
-        
+        # 2. 트리맵 (등락률 시각화)
         fig = px.treemap(
             market_df,
             path=['Category', 'Name'],
-            values='Price', # 크기는 가격 기준
-            color='Change', # 색상은 등락률 기준
-            color_continuous_scale=['#EF4444', '#1F2937', '#10B981'], # Red -> Grey -> Green
-            color_continuous_midpoint=0, # 0을 기준으로 색 분기
+            values='Price', 
+            color='Change', 
+            color_continuous_scale=['#EF4444', '#1F2937', '#10B981'], # Red -> Dark -> Green
+            color_continuous_midpoint=0,
             template="plotly_dark"
         )
         
         fig.update_traces(
-            texttemplate='<b>%{label}</b><br>%{value:,.0f}<br>%{color:.2f}%', # 이름, 가격, 등락률 표시
+            texttemplate='<b>%{label}</b><br>%{value:,.2f}<br>%{color:.2f}%',
             textfont=dict(size=24, family="sans-serif", color="white"),
             textposition="middle center",
             marker=dict(line=dict(width=3, color='#000000')),
@@ -277,7 +282,7 @@ elif menu == "지수 비교 (Indices)":
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         
     else:
-        st.error("데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")
+        st.error("데이터를 불러오는 중입니다... (잠시 후 다시 시도해주세요)")
 
 # 관리자 동기화 버튼 (공통)
 if is_admin:
