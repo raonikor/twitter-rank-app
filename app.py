@@ -3,15 +3,16 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 import numpy as np
+from datetime import datetime, timedelta, timezone
 
-# [핵심] 분리된 모듈들 불러오기
+# [모듈 사용]
 import market_logic 
 import visitor_logic
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
 
-# 2. CSS 스타일 (디자인 코드는 메인에 두는 것이 관리하기 좋습니다)
+# 2. CSS 스타일
 st.markdown("""
     <style>
     /* 전체 테마 */
@@ -43,6 +44,38 @@ st.markdown("""
     .vis-today { color: #10B981; }
     .vis-total { color: #E5E7EB; }
     .vis-divider { height: 1px; background-color: #2D3035; margin: 8px 0; }
+
+    /* [NEW] 만든이(Creator) 박스 스타일 */
+    .creator-box {
+        display: flex;
+        align-items: center;
+        background-color: #1C1F26;
+        border: 1px solid #2D3035;
+        border-radius: 12px;
+        padding: 10px 15px;
+        margin-top: 10px;
+        text-decoration: none !important; /* 링크 밑줄 제거 */
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .creator-box:hover {
+        border-color: #10B981; /* 호버 시 초록색 테두리 */
+        background-color: #252830;
+    }
+    .creator-img {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        margin-right: 12px;
+        border: 2px solid #2D3035;
+    }
+    .creator-info {
+        display: flex;
+        flex-direction: column;
+    }
+    .creator-label { font-size: 10px; color: #9CA3AF; margin-bottom: 2px; }
+    .creator-name { font-size: 14px; font-weight: 700; color: #FFFFFF; }
+    .creator-handle { font-size: 12px; color: #6B7280; }
 
     /* 메인 컨텐츠 요소 */
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
@@ -112,6 +145,19 @@ with st.sidebar:
 
     # [모듈 사용] 방문자 위젯 표시
     visitor_logic.display_visitor_widget(total_visitors, today_visitors)
+
+    # [NEW] 만든이(Creator) 프로필 카드
+    # unavatar.io를 통해 트위터 프로필 사진을 자동으로 가져옵니다.
+    st.markdown("""
+        <a href="https://x.com/raonikor" target="_blank" class="creator-box">
+            <img src="https://unavatar.io/twitter/raonikor" class="creator-img">
+            <div class="creator-info">
+                <div class="creator-label">Made by</div>
+                <div class="creator-name">Raoni <span style="font-weight:400; color:#9CA3AF; font-size:12px;">@raonikor</span></div>
+            </div>
+        </a>
+    """, unsafe_allow_html=True)
+
 
 # ==========================================
 # [PAGE 1] 트위터 팔로워 맵
