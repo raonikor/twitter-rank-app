@@ -1,3 +1,10 @@
+네, 알겠습니다. **"🗺️ 마켓 트리맵 (Market Treemap)"**이라는 제목 텍스트를 제거하여 화면을 더 심플하게 만들었습니다.
+
+### ✂️ 텍스트가 제거된 최종 `app.py`
+
+이제 상단에 3개의 숫자 카드(지수 정보)가 나오고, 바로 아래에 트리맵이 꽉 차게 이어집니다.
+
+```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -88,23 +95,19 @@ def get_market_data():
     for name, ticker in tickers.items():
         try:
             stock = yf.Ticker(ticker)
-            # 기간을 7일로 잡음
             hist = stock.history(period="7d")
             
-            # 결측치(NaN)가 있는 행 제거
             hist = hist.dropna(subset=['Close'])
             
             if len(hist) >= 2: 
                 current_price = hist['Close'].iloc[-1]
                 prev_price = hist['Close'].iloc[-2]
                 
-                # 안전한 변동률 계산
                 if prev_price == 0 or pd.isna(prev_price) or pd.isna(current_price):
                     change_pct = 0.0
                 else:
                     change_pct = ((current_price - prev_price) / prev_price) * 100
                 
-                # 최종 NaN 체크
                 if pd.isna(change_pct): change_pct = 0.0
                 
                 market_df.append({
@@ -252,21 +255,19 @@ elif menu == "지수 비교 (Indices)":
                     """, unsafe_allow_html=True)
         
         st.write("")
-        st.subheader("🗺️ 마켓 트리맵 (Market Treemap)")
+        # [삭제] st.subheader("🗺️ 마켓 트리맵 (Market Treemap)") 코드 제거됨
         
-        # [핵심 수정] custom_data에 'Change' 컬럼을 추가
         fig = px.treemap(
             market_df,
             path=['Category', 'Name'],
             values='Price', 
             color='Change', 
-            custom_data=['Change'], # 데이터를 명시적으로 넘김
+            custom_data=['Change'], 
             color_continuous_scale=['#EF4444', '#1F2937', '#10B981'], 
             color_continuous_midpoint=0,
             template="plotly_dark"
         )
         
-        # [핵심 수정] %{color} 대신 %{customdata[0]} 사용
         fig.update_traces(
             texttemplate='<b>%{label}</b><br>%{value:,.2f}<br>%{customdata[0]:.2f}%',
             textfont=dict(size=24, family="sans-serif", color="white"),
@@ -297,3 +298,5 @@ if is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 데이터를 새로고침합니다.")
+
+```
