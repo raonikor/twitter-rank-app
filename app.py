@@ -1,15 +1,18 @@
+# app.py
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 import numpy as np
-import yfinance as yf
 from datetime import datetime, timedelta, timezone
 
-# 1. 페이지 설정
-st.set_page_config(page_title="트위터 팔로워 맵 & 마켓", layout="wide")
+# [NEW] 분리한 모듈 불러오기
+import market_logic 
 
-# 2. CSS 스타일
+# 1. 페이지 설정
+st.set_page_config(page_title="Raoni Map", layout="wide")
+
+# 2. CSS 스타일 (Raoni Map 스타일 유지)
 st.markdown("""
     <style>
     /* 전체 배경 */
@@ -21,7 +24,7 @@ st.markdown("""
         border-right: 1px solid #333;
     }
     
-    /* 사이드바 라디오 버튼 컨테이너 (간격 최소화) */
+    /* 사이드바 라디오 버튼 컨테이너 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] {
         gap: 2px;
     }
@@ -31,7 +34,7 @@ st.markdown("""
         display: none !important;
     }
 
-    /* [기본 상태] 메뉴 항목 디자인 */
+    /* 메뉴 항목 디자인 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
         display: flex;
         width: 100%;
@@ -43,28 +46,26 @@ st.markdown("""
         margin-bottom: 1px;
     }
 
-    /* [기본 상태] 텍스트 색상 (내부 p태그 강제 지정) */
+    /* 텍스트 색상 (기본: 연회색) */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label div,
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label p {
-        color: #B0B3B8 !important; /* 기본은 연한 회색 */
+        color: #B0B3B8 !important;
         font-size: 14px;
         font-weight: 500;
     }
 
-    /* [호버 상태] 마우스 올렸을 때 */
+    /* 호버 상태 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover {
         background-color: #282A2C !important;
     }
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover p {
-        color: #FFFFFF !important; /* 호버 시 흰색 */
+        color: #FFFFFF !important;
     }
 
-    /* [선택된 상태] 배경색 변경 */
+    /* 선택된 상태 (제미니 블루 + 흰색 글씨) */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) {
-        background-color: #004A77 !important; /* 제미니 블루 */
+        background-color: #004A77 !important;
     }
-
-    /* [선택된 상태] 텍스트 색상 강제 흰색 (가장 중요!) */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) div,
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) p,
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) span {
@@ -72,7 +73,7 @@ st.markdown("""
         font-weight: 700;
     }
 
-    /* 사이드바 헤더 (소제목) 스타일 */
+    /* 사이드바 헤더 */
     .sidebar-header {
         font-size: 11px;
         font-weight: 700;
@@ -84,10 +85,7 @@ st.markdown("""
         opacity: 0.9;
     }
 
-    /* ---------------------------------------------------- */
-    /* 기존 앱 스타일 유지 */
-    /* ---------------------------------------------------- */
-    
+    /* 메인 컨텐츠 스타일 */
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
@@ -143,6 +141,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 def check_and_update_visitors():
     try:
         v_df = conn.read(worksheet="visitors", ttl=0)
+        
         if v_df.empty or 'total' not in v_df.columns:
             return 0, 0
             
@@ -150,6 +149,7 @@ def check_and_update_visitors():
         current_today = int(v_df.iloc[0]['today'])
         stored_date = str(v_df.iloc[0]['last_date'])
         
+        # 한국 시간 기준
         kst = timezone(timedelta(hours=9))
         today_str = datetime.now(kst).strftime("%Y-%m-%d")
         
@@ -189,23 +189,6 @@ def get_sheet_data():
             else: df['name'] = df['name'].fillna(df['handle'])
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category'])
-
-@st.cache_data(ttl="5m") 
-def get_market_data():
-    tickers = {'KOSPI': '^KS11', 'Gold': 'GC=F', 'Ethereum': 'ETH-USD'}
-    market_df = []
-    for name, ticker in tickers.items():
-        try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="7d")
-            hist = hist.dropna(subset=['Close'])
-            if len(hist) >= 2: 
-                current_price = hist['Close'].iloc[-1]
-                prev_price = hist['Close'].iloc[-2]
-                change_pct = ((current_price - prev_price) / prev_price) * 100 if prev_price != 0 else 0
-                market_df.append({'Name': name, 'Price': current_price, 'Change': change_pct, 'Category': 'Major Asset'})
-        except: continue
-    return pd.DataFrame(market_df)
 
 # 4. 사이드바 구성 (Raoni Map 스타일)
 with st.sidebar:
@@ -324,45 +307,10 @@ if menu == "트위터 팔로워 맵":
 # [PAGE 2] 지수 비교 (Indices)
 # ==========================================
 elif menu == "지수 비교 (Indices)":
-    st.title("📊 시장 지수 (Market Indices)")
-    st.caption("Real-time Data: KOSPI, Gold, Ethereum")
-    
-    market_df = get_market_data()
-    
-    if not market_df.empty:
-        col1, col2, col3 = st.columns(3)
-        cols = [col1, col2, col3]
-        for i, row in market_df.iterrows():
-            if i < 3:
-                name, price, change = row['Name'], row['Price'], row['Change']
-                color_class = "delta-up" if change >= 0 else "delta-down"
-                arrow = "▲" if change >= 0 else "▼"
-                with cols[i]:
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <div class="metric-label">{name}</div>
-                        <div class="metric-value">{price:,.2f}</div>
-                        <div class="metric-delta {color_class}">{arrow} {change:.2f}%</div>
-                    </div>""", unsafe_allow_html=True)
-        
-        st.write("")
-        fig = px.treemap(
-            market_df, path=['Category', 'Name'], values='Price', color='Change', 
-            custom_data=['Change'], color_continuous_scale=['#EF4444', '#1F2937', '#10B981'], 
-            color_continuous_midpoint=0, template="plotly_dark"
-        )
-        fig.update_traces(
-            texttemplate='<b>%{label}</b><br>%{value:,.2f}<br>%{customdata[0]:.2f}%',
-            textfont=dict(size=24, family="sans-serif", color="white"),
-            textposition="middle center", marker=dict(line=dict(width=3, color='#000000')), root_color="#000000"
-        )
-        fig.update_layout(
-            margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='#000000', plot_bgcolor='#000000', height=500,
-            font=dict(family="sans-serif"), coloraxis_showscale=False
-        )
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-    else: st.error("데이터 로딩 중...")
+    # [NEW] 모듈을 통해 화면 렌더링 호출
+    market_logic.render_market_page()
 
+# 관리자 동기화 (Admin Sync)
 if is_admin:
     st.divider()
     st.header("🛠️ Admin Dashboard")
