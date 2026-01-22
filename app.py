@@ -1,3 +1,13 @@
+네, **최근 관심사는 "흰색에 가까운 라임색(#F4FF81)"**, **비고 버튼은 "파란색(#2979FF)"**으로 변경하여 디자인을 수정했습니다. 어두운 배경에서 글씨가 잘 보이도록 색상 대비를 조정했습니다.
+
+### 🎨 색상 변경 사항
+
+* **최근 관심 (Recent Interest):** `#F4FF81` (아주 밝은 라임색)
+* **비고 (Note Badge):** `#2979FF` (선명한 파란색) + **흰색 글씨** (가독성 확보)
+
+아래 코드를 **`app.py`** 전체에 덮어쓰기 하세요.
+
+```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -113,23 +123,23 @@ st.markdown("""
         overflow: hidden;
     }
     
-    /* [수정됨] 1. 최근 관심 (밝은 주황색) */
+    /* [수정됨] 1. 최근 관심 (흰색에 가까운 라임색) */
     .rank-interest { 
         font-size: 13px; 
-        color: #FF9100 !important; /* 밝은 주황색 */
+        color: #F4FF81 !important; /* 아주 밝은 라임색 */
         font-weight: 700; 
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
         margin-bottom: 0;
     }
     
-    /* [수정됨] 2. 비고 (밝은 라임색 버튼) */
+    /* [수정됨] 2. 비고 (파란색 버튼 + 흰색 글씨) */
     .rank-note { 
         font-size: 11px; 
-        color: #000000; /* 검은색 글씨 */
-        background-color: #C6FF00; /* 밝은 라임색 */
+        color: #FFFFFF; /* 흰색 글씨 */
+        background-color: #2979FF; /* 밝은 파란색 */
         padding: 2px 8px; 
         border-radius: 12px; 
-        font-weight: 700;
+        font-weight: 600;
         white-space: nowrap; 
         flex-shrink: 0; 
     }
@@ -279,7 +289,7 @@ if menu == "트위터 팔로워 맵":
             ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
             view_total = ranking_df['followers'].sum()
             
-            # [NEW] 데이터 안전 정제 함수
+            # 데이터 정제 함수
             def clean_str(val):
                 if pd.isna(val): return ""
                 s = str(val).strip()
@@ -353,3 +363,5 @@ if is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 데이터를 새로고침합니다.")
+
+```
