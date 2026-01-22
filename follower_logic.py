@@ -5,9 +5,67 @@ import numpy as np
 import html
 
 def render_follower_page(conn, df):
+    # ---------------------------------------------------------
+    # [CSS] 카테고리 버튼 스타일링 (알약 모양 버튼)
+    # ---------------------------------------------------------
+    st.markdown("""
+    <style>
+    /* 가로형 라디오 버튼 컨테이너 */
+    div[role="radiogroup"] {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* 버튼(Label) 기본 스타일 */
+    div[role="radiogroup"] label {
+        background-color: #1C1F26; /* 어두운 배경 */
+        border: 1px solid #2D3035;
+        border-radius: 20px !important; /* 둥근 모서리 */
+        padding: 6px 16px !important;
+        margin-right: 0px;
+        transition: all 0.2s ease;
+        justify-content: center;
+        width: auto !important;
+    }
+
+    /* 기본 라디오 버튼(동그라미) 숨기기 */
+    div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+
+    /* 텍스트 스타일 */
+    div[role="radiogroup"] label p {
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        color: #B0B3B8 !important;
+        margin: 0 !important;
+    }
+
+    /* [선택됨] 상태 스타일 */
+    div[role="radiogroup"] label:has(input:checked) {
+        background-color: #004A77 !important; /* 파란색 강조 */
+        border-color: #004A77 !important;
+    }
+    
+    /* [선택됨] 텍스트 색상 */
+    div[role="radiogroup"] label:has(input:checked) p {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+    }
+
+    /* 마우스 오버 효과 */
+    div[role="radiogroup"] label:hover {
+        border-color: #004A77;
+        background-color: #252830;
+        cursor: pointer;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.title("트위터 팔로워 맵 (Follower Map)")
     
-    # 1. 데이터가 비어있는지 확인
     if df.empty:
         st.info("데이터를 불러올 수 없습니다.")
         return
@@ -15,26 +73,24 @@ def render_follower_page(conn, df):
     # ---------------------------------------------------------
     # [UI] 카테고리 선택 (메인 화면 상단 배치)
     # ---------------------------------------------------------
-    # 전체 카테고리 목록 생성
     if 'category' in df.columns:
+        # '전체보기'를 맨 앞에, 나머지는 가나다순 정렬
         all_cats = ["전체보기"] + sorted(df['category'].dropna().unique().tolist())
     else:
         all_cats = ["전체보기"]
 
-    # 화면 분할 (왼쪽: 카테고리 버튼 / 오른쪽: 여백)
-    col_cat, _ = st.columns([0.8, 0.2])
-    
-    with col_cat:
-        selected_category = st.radio(
-            "카테고리 선택", 
-            all_cats, 
-            horizontal=True, 
-            label_visibility="collapsed",
-            key="follower_category_main"
-        )
+    # 화면 분할 없이 꽉 차게 배치하거나, 오른쪽 여백을 둘 수 있음
+    st.write("카테고리 선택") # 라벨 명시
+    selected_category = st.radio(
+        "카테고리 선택",  # 실제로는 CSS로 숨김 처리되거나 위화감 없게 배치됨
+        all_cats, 
+        horizontal=True, 
+        label_visibility="collapsed",
+        key="follower_category_main"
+    )
 
     st.caption(f"Twitter Follower Map - {selected_category}")
-    st.write("") # 간격
+    st.write("") 
 
     # ---------------------------------------------------------
     # 데이터 필터링
@@ -49,7 +105,7 @@ def render_follower_page(conn, df):
         return
 
     # ---------------------------------------------------------
-    # 상단 요약 지표 (Metrics)
+    # 상단 요약 지표
     # ---------------------------------------------------------
     col1, col2, col3 = st.columns(3)
     total_acc = len(display_df)
@@ -67,14 +123,12 @@ def render_follower_page(conn, df):
     st.write("")
 
     # ---------------------------------------------------------
-    # 2. 트리맵 차트
+    # 트리맵 차트
     # ---------------------------------------------------------
-    # 차트 라벨 생성
     display_df['chart_label'] = display_df.apply(
         lambda x: f"{str(x['name'])}<br><span style='font-size:0.7em; font-weight:normal;'>@{str(x['handle'])}</span>", 
         axis=1
     )
-    # 로그 스케일 적용 (시각적 균형 위해)
     display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
 
     fig = px.treemap(
@@ -109,7 +163,7 @@ def render_follower_page(conn, df):
     st.write("")
     
     # ---------------------------------------------------------
-    # 3. 리더보드 리스트
+    # 리더보드 리스트
     # ---------------------------------------------------------
     col_head, col_toggle = st.columns([1, 0.3])
     with col_head:
@@ -117,11 +171,9 @@ def render_follower_page(conn, df):
     with col_toggle:
         expand_view = st.toggle("전체 펼치기", value=False, key="follower_list_toggle")
     
-    # 팔로워 순 정렬
     ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
     view_total = ranking_df['followers'].sum()
     
-    # 데이터 정제 헬퍼 함수
     def clean_str(val):
         if pd.isna(val): return ""
         s = str(val).strip()
@@ -137,14 +189,11 @@ def render_follower_page(conn, df):
         
         recent_raw = clean_str(row.get('recent_interest', ''))
         note_raw = clean_str(row.get('note', ''))
-        
         recent_safe = html.escape(recent_raw)
         note_safe = html.escape(note_raw)
-        
         interest_html = f"<div class='rank-interest'>{recent_safe}</div>" if recent_safe else ""
         note_html = f"<span class='rank-note'>{note_safe}</span>" if note_safe else ""
         
-        # bio 내용
         if 'bio' not in row: bio_content = "소개글이 없습니다."
         else: bio_content = clean_str(row['bio'])
         if not bio_content: bio_content = "소개글이 없습니다."
