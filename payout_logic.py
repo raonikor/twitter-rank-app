@@ -4,11 +4,11 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 
-# 1. 주급 데이터 가져오기
-@st.cache_data(ttl="30m")
-def get_payout_data(conn):
+# [수정] @st.cache_data 제거 -> conn.read의 ttl 기능을 사용하여 해결
+def get_payout_data(conn): 
     try:
-        df = conn.read(worksheet="payouts", ttl="0") # 'payouts' 시트 읽기
+        # ttl="30m"을 설정하여 여기서 30분간 데이터를 캐싱합니다.
+        df = conn.read(worksheet="payouts", ttl="30m") 
         
         if df is not None and not df.empty:
             # 숫자 변환 (콤마 제거 등 안전장치)
@@ -23,7 +23,7 @@ def get_payout_data(conn):
             
         return df
     except Exception as e:
-        # st.error(f"주급 데이터 오류: {e}") # 디버깅용
+        # 에러 발생 시 빈 데이터프레임 반환
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category'])
 
 # 2. 주급 맵 렌더링
@@ -31,6 +31,7 @@ def render_payout_page(conn):
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
     st.caption("이번 주 트위터 수익 정산 현황")
 
+    # 함수 호출 (캐싱 데코레이터가 없으므로 일반적인 함수 호출과 동일하게 안전함)
     df = get_payout_data(conn)
     
     if not df.empty:
@@ -70,7 +71,7 @@ def render_payout_page(conn):
             values='payout_amount', 
             color='payout_amount',
             custom_data=['name', 'handle'],
-            # 초록색 그라데이션 (돈 느낌)
+            # 초록색 그라데이션
             color_continuous_scale=[
                 (0.0, '#1B2E1E'), (0.2, '#2E5936'), (0.5, '#34A853'), (1.0, '#A8D67F')
             ],
