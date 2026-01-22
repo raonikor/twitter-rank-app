@@ -113,7 +113,7 @@ st.markdown("""
         overflow: hidden;
     }
     
-    /* [수정됨] 1. 최근 관심 (채도 낮춘 라임색) */
+    /* 1. 최근 관심 (채도 낮춘 라임색) */
     .rank-interest { 
         font-size: 13px; 
         color: #D4E157 !important; /* 눈이 편안한 라임색 */
@@ -122,11 +122,11 @@ st.markdown("""
         margin-bottom: 0;
     }
     
-    /* [수정됨] 2. 비고 (어두운 남색 버튼) */
+    /* [수정됨] 2. 비고 (딥 네이비 - 요청하신 이미지 색상) */
     .rank-note { 
         font-size: 11px; 
         color: #FFFFFF; /* 흰색 글씨 */
-        background-color: #1A237E; /* 진한 남색 (Dark Navy) */
+        background-color: #004A77; /* Raoni 딥 네이비 */
         padding: 2px 8px; 
         border-radius: 12px; 
         font-weight: 600;
