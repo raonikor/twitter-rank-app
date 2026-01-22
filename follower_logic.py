@@ -81,7 +81,7 @@ def render_follower_page(conn, df):
 
     # 2. 기본값(index) 설정: '크립토'가 있으면 그걸로, 없으면 0번(전체보기)
     default_index = 0
-    target_category = "크립토"  # [수정] 기본으로 보여줄 카테고리 이름
+    target_category = "크립토" 
     
     if target_category in all_cats:
         default_index = all_cats.index(target_category)
@@ -94,7 +94,7 @@ def render_follower_page(conn, df):
         selected_category = st.radio(
             "카테고리 선택", 
             all_cats, 
-            index=default_index, # [수정] 여기서 기본값 설정
+            index=default_index, 
             horizontal=True, 
             label_visibility="collapsed",
             key="follower_category_main"
@@ -142,7 +142,7 @@ def render_follower_page(conn, df):
     st.write("")
 
     # ---------------------------------------------------------
-    # 2. 트리맵 차트 (통합 보기 로직 추가)
+    # 2. 트리맵 차트
     # ---------------------------------------------------------
     display_df['chart_label'] = display_df.apply(
         lambda x: f"{str(x['name'])}<br><span style='font-size:0.7em; font-weight:normal;'>@{str(x['handle'])}</span>", 
@@ -150,7 +150,7 @@ def render_follower_page(conn, df):
     )
     display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
 
-    # [NEW] 통합 보기 로직
+    # 통합 보기 로직
     if merge_categories:
         display_df['root_group'] = "전체 (All)"
         path_list = ['root_group', 'chart_label']
@@ -217,12 +217,23 @@ def render_follower_page(conn, df):
         note_raw = clean_str(row.get('note', ''))
         recent_safe = html.escape(recent_raw)
         note_safe = html.escape(note_raw)
+        
         interest_html = f"<div class='rank-interest'>{recent_safe}</div>" if recent_safe else ""
         note_html = f"<span class='rank-note'>{note_safe}</span>" if note_safe else ""
         
         if 'bio' not in row: bio_content = "소개글이 없습니다."
         else: bio_content = clean_str(row['bio'])
         if not bio_content: bio_content = "소개글이 없습니다."
+
+        # [NEW] 확장 영역에 표시할 최근활동 내용 (줄바꿈 허용)
+        expanded_recent = ""
+        if recent_safe:
+            expanded_recent = f"""
+            <div style="margin-bottom: 12px;">
+                <div class="bio-header" style="color: #D4E157;">📌 RECENT ACTIVITY</div>
+                <div class="bio-content" style="font-weight: 500; color: #FFFFFF;">{recent_safe}</div>
+            </div>
+            """
 
         list_html += f"""
         <details {'open' if expand_view else ''}>
@@ -248,6 +259,7 @@ def render_follower_page(conn, df):
                 </div>
             </summary>
             <div class="bio-box">
+                {expanded_recent}
                 <div class="bio-header">📝 PROFILE BIO</div>
                 <div class="bio-content">{bio_content}</div>
                 <a href="https://twitter.com/{row['handle']}" target="_blank" class="bio-link-btn">
