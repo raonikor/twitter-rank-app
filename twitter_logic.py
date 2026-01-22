@@ -9,7 +9,8 @@ import numpy as np
 @st.cache_data(ttl="30m")
 def get_payout_data(_conn): 
     try:
-        df = _conn.read(worksheet="payouts", ttl="0") # 내부 변수명도 _conn으로 변경
+        # 내부에서도 _conn으로 사용
+        df = _conn.read(worksheet="payouts", ttl="0") 
         
         if df is not None and not df.empty:
             # 숫자 변환 (콤마 제거 등 안전장치)
@@ -24,7 +25,6 @@ def get_payout_data(_conn):
             
         return df
     except Exception as e:
-        # st.error(f"주급 데이터 오류: {e}") 
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category'])
 
 # 2. 주급 맵 렌더링
@@ -32,7 +32,7 @@ def render_payout_page(conn):
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
     st.caption("이번 주 트위터 수익 정산 현황")
 
-    # 호출할 때는 그냥 conn을 넘겨주면 됩니다.
+    # 호출할 때는 그냥 conn을 넘겨주면 됩니다. (받는 쪽이 _conn으로 받음)
     df = get_payout_data(conn)
     
     if not df.empty:
