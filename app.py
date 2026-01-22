@@ -1,12 +1,3 @@
-네, 메인 화면 **최상단에 흐르는 뉴스 티커(News Ticker)** 기능을 추가해 드리겠습니다.
-
-CSS 애니메이션을 활용하여 부드럽게 흘러가는 현대적인 디자인으로 구현했습니다. `app.py` 파일의 **`st.markdown` (CSS 스타일)** 부분과 **메인 로직 시작 부분**에 코드를 추가하면 됩니다.
-
-**`app.py`** 전체 코드를 아래 내용으로 덮어씌워 주세요.
-
-### 📰 뉴스 티커가 추가된 `app.py`
-
-```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -264,5 +255,3 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
-
-```
