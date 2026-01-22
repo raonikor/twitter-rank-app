@@ -275,12 +275,11 @@ if menu == "트위터 팔로워 맵":
 
             st.write("")
             
-            # [NEW] 제목 옆에 펼치기 토글 추가
+            # 토글 버튼
             col_head, col_toggle = st.columns([1, 0.3])
             with col_head:
                 st.subheader("🏆 팔로워 순위 (Leaderboard)")
             with col_toggle:
-                # 토글 버튼: 켜지면 전체보기, 꺼지면 스크롤
                 expand_view = st.toggle("전체 펼치기", value=False)
             
             ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
@@ -331,12 +330,13 @@ if menu == "트위터 팔로워 맵":
                 </div>
                 """
             
-            # [NEW] 동적 높이 설정 (토글에 따라 변경)
-            # expand_view가 True면 None(전체 높이), False면 600px(스크롤)
-            container_height = None if expand_view else 600
-            
-            with st.container(height=container_height): 
-                st.markdown(list_html, unsafe_allow_html=True)
+            # [버그 수정] 조건부 컨테이너 생성
+            if expand_view:
+                with st.container():
+                    st.markdown(list_html, unsafe_allow_html=True)
+            else:
+                with st.container(height=600):
+                    st.markdown(list_html, unsafe_allow_html=True)
     else: st.info("데이터가 없습니다.")
 
 # ==========================================
