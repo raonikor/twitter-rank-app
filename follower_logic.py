@@ -73,24 +73,21 @@ def render_follower_page(conn, df):
     # ---------------------------------------------------------
     # [UI] 카테고리 선택 & 통합 보기 토글
     # ---------------------------------------------------------
-    # 1. 카테고리 리스트 생성
     if 'category' in df.columns:
         all_cats = ["전체보기"] + sorted(df['category'].dropna().unique().tolist())
     else:
         all_cats = ["전체보기"]
 
-    # 2. 기본값(index) 설정: '크립토'가 있으면 그걸로, 없으면 0번(전체보기)
+    # 기본값 설정: '크립토' 우선
     default_index = 0
     target_category = "크립토" 
-    
     if target_category in all_cats:
         default_index = all_cats.index(target_category)
 
-    # 화면 분할 (왼쪽: 카테고리 버튼 / 오른쪽: 통합 토글)
     col_cat, col_opt = st.columns([0.8, 0.2])
     
     with col_cat:
-        st.write("카테고리 선택") # 라벨 명시
+        st.write("카테고리 선택") 
         selected_category = st.radio(
             "카테고리 선택", 
             all_cats, 
@@ -102,9 +99,8 @@ def render_follower_page(conn, df):
         
     with col_opt:
         merge_categories = False
-        # '전체보기'일 때만 토글 버튼 표시
         if selected_category == "전체보기":
-            st.write("") # 줄맞춤용 공백
+            st.write("") 
             st.write("") 
             merge_categories = st.toggle("통합 보기", value=False, key="follower_merge_toggle")
 
@@ -150,7 +146,6 @@ def render_follower_page(conn, df):
     )
     display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
 
-    # 통합 보기 로직
     if merge_categories:
         display_df['root_group'] = "전체 (All)"
         path_list = ['root_group', 'chart_label']
@@ -225,16 +220,12 @@ def render_follower_page(conn, df):
         else: bio_content = clean_str(row['bio'])
         if not bio_content: bio_content = "소개글이 없습니다."
 
-        # [NEW] 확장 영역에 표시할 최근활동 내용 (줄바꿈 허용)
+        # [수정됨] 마크다운 코드 블록 인식을 막기 위해 한 줄로 작성 (들여쓰기 제거)
         expanded_recent = ""
         if recent_safe:
-            expanded_recent = f"""
-            <div style="margin-bottom: 12px;">
-                <div class="bio-header" style="color: #D4E157;">📌 RECENT ACTIVITY</div>
-                <div class="bio-content" style="font-weight: 500; color: #FFFFFF;">{recent_safe}</div>
-            </div>
-            """
+            expanded_recent = f'<div style="margin-bottom: 12px;"><div class="bio-header" style="color: #D4E157;">📌 RECENT ACTIVITY</div><div class="bio-content" style="font-weight: 500; color: #FFFFFF;">{recent_safe}</div></div>'
 
+        # 리스트 HTML 구성 (들여쓰기를 최소화하거나 주의해야 함)
         list_html += f"""
         <details {'open' if expand_view else ''}>
             <summary>
