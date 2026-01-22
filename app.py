@@ -101,35 +101,36 @@ st.markdown("""
     .rank-name { font-size: 15px; font-weight: 700; color: #FFFFFF !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
     .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;}
     
-    /* [수정됨] 최근 관심 & 비고 스타일 */
+    /* [수정됨] 1줄 배치 (Flex Row) */
     .rank-extra { 
         flex-grow: 1; 
         min-width: 0; 
-        display: flex; flex-direction: column; justify-content: center; 
-        align-items: flex-start; /* 왼쪽 정렬 */
+        display: flex; 
+        flex-direction: row; /* 가로 배치 */
+        align-items: center; /* 수직 중앙 정렬 */
+        gap: 8px; /* 항목 사이 간격 */
+        overflow: hidden;
     }
     
-    /* 1. 최근 관심 (빨간색 텍스트) */
+    /* 1. 요약 (빨간색 텍스트) */
     .rank-interest { 
         font-size: 13px; 
-        color: #FF5252 !important; /* 밝은 빨강 */
+        color: #FF5252 !important; /* 빨간색 */
         font-weight: 700; 
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-        margin-bottom: 4px;
-        width: 100%;
+        margin-bottom: 0; /* 마진 제거 */
     }
     
-    /* 2. 비고 (노란색 버튼 모양) */
+    /* 2. 비고 (노란색 버튼) */
     .rank-note { 
         font-size: 11px; 
-        color: #000000; /* 검은 글씨 */
-        background-color: #F59E0B; /* 노란색 배경 */
-        padding: 2px 8px; /* 안쪽 여백 */
-        border-radius: 12px; /* 둥근 모서리 */
+        color: #000000; 
+        background-color: #F59E0B; /* 노란색 */
+        padding: 2px 8px; 
+        border-radius: 12px; 
         font-weight: 600;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-        display: inline-block;
-        max-width: 100%;
+        white-space: nowrap; 
+        flex-shrink: 0; /* 버튼이 찌그러지지 않게 고정 */
     }
 
     .rank-stats-group { display: flex; align-items: center; justify-content: flex-end; width: 180px; flex-shrink: 0; }
