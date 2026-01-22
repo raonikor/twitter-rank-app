@@ -177,19 +177,22 @@ def get_sheet_data():
 with st.sidebar:
     st.markdown("### **Raoni Map**")
     
-    st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
-    menu = st.radio(" ", ["트위터 팔로워 맵", "실시간 트위터", "지수 비교 (Indices)", "텔레그램 이벤트"], label_visibility="collapsed")
+    # [설정] 메뉴가 들어갈 빈 공간을 미리 확보 (나중에 채움)
+    menu_placeholder = st.empty()
     
     st.divider()
     
-    if menu == "트위터 팔로워 맵":
-        df = get_sheet_data()
-        st.markdown('<div class="sidebar-header">카테고리 (CATEGORY)</div>', unsafe_allow_html=True)
-        available_cats = ["전체보기"]
-        if not df.empty: available_cats.extend(sorted(df['category'].unique().tolist()))
-        selected_category = st.radio("카테고리 선택", available_cats, label_visibility="collapsed")
+    # [기본 메뉴 로직 - 임시]
+    # 나중에 아래에서 is_admin 확인 후 다시 렌더링하지만, 
+    # 흐름상 여기서 데이터를 먼저 준비해야 하는 경우도 있음.
+    # 여기서는 비워두고 아래쪽에서 한 번에 처리합니다.
+    
+    # 카테고리 필터 (트위터 맵일 때만 표시해야 하므로 나중에 처리)
+    category_placeholder = st.empty()
     
     for _ in range(3): st.write("")
+    
+    # [관리자 로그인 섹션] - 사이드바 하단
     with st.expander("⚙️ 설정 (Admin)", expanded=False):
         admin_pw = st.text_input("Key", type="password")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
@@ -214,6 +217,25 @@ with st.sidebar:
             </div>
         </a>
     """, unsafe_allow_html=True)
+
+# [핵심 로직] 메뉴 구성 (관리자 여부에 따라 리스트 변경)
+menu_options = ["트위터 팔로워 맵", "실시간 트위터", "지수 비교 (Indices)", "텔레그램 이벤트"]
+if is_admin:
+    menu_options.append("관리자 페이지") # [NEW] 관리자만 보이는 메뉴
+
+# [메뉴 렌더링] 위에서 만들어둔 placeholder에 메뉴를 그립니다.
+with menu_placeholder.container():
+    st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
+    menu = st.radio(" ", menu_options, label_visibility="collapsed")
+
+# [카테고리 필터 렌더링] 메뉴가 '트위터 팔로워 맵'일 때만 표시
+if menu == "트위터 팔로워 맵":
+    df = get_sheet_data()
+    with category_placeholder.container():
+        st.markdown('<div class="sidebar-header">카테고리 (CATEGORY)</div>', unsafe_allow_html=True)
+        available_cats = ["전체보기"]
+        if not df.empty: available_cats.extend(sorted(df['category'].unique().tolist()))
+        selected_category = st.radio("카테고리 선택", available_cats, label_visibility="collapsed")
 
 
 # ==========================================
@@ -330,7 +352,7 @@ if menu == "트위터 팔로워 맵":
                 </div>
                 """
             
-            # [버그 수정] 조건부 컨테이너 생성
+            # 조건부 컨테이너 생성
             if expand_view:
                 with st.container():
                     st.markdown(list_html, unsafe_allow_html=True)
@@ -357,12 +379,18 @@ elif menu == "지수 비교 (Indices)":
 elif menu == "텔레그램 이벤트":
     event_logic.render_event_page(conn)
 
-if is_admin:
+# ==========================================
+# [PAGE 5] 관리자 페이지 (Admin Only)
+# ==========================================
+elif menu == "관리자 페이지" and is_admin:
+    st.title("🛠️ 관리자 대시보드 (Admin Dashboard)")
+    st.info(f"관리자 모드로 접속 중입니다.")
+    
     st.divider()
-    st.header("🛠️ Admin Dashboard")
+    
     col1, col2 = st.columns([1, 3])
     with col1:
         if st.button("🔄 데이터 동기화 (Sync)", type="primary", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
-    with col2: st.write("👈 데이터를 새로고침합니다.")
+    with col2: st.write("👈 구글 시트 데이터를 즉시 새로고침합니다.")
