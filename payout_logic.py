@@ -16,13 +16,13 @@ def get_payout_data(conn):
             ).fillna(0)
             
             df['category'] = df['category'].fillna('미분류')
-            df['handle'] = df['handle'].astype(str)
+            df['handle'] = df['handle'].astype(str).str.strip() # 공백 제거
             
             # 이름 없으면 핸들로 대체
             if 'name' not in df.columns: df['name'] = df['handle']
             else: df['name'] = df['name'].fillna(df['handle'])
             
-            # 트위터 맵과 동일한 구조를 위해 bio 컬럼이 없으면 빈칸 처리
+            # bio 컬럼 처리
             if 'bio' not in df.columns: df['bio'] = ""
             else: df['bio'] = df['bio'].fillna("")
             
@@ -30,20 +30,36 @@ def get_payout_data(conn):
     except Exception as e:
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category', 'bio'])
 
-# 2. 주급 맵 렌더링
-def render_payout_page(conn):
+# 2. 주급 맵 렌더링 (follower_df 인자 추가됨)
+def render_payout_page(conn, follower_df):
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
     st.caption("이번 주 트위터 수익 정산 현황")
 
-    df = get_payout_data(conn)
+    payout_df = get_payout_data(conn)
     
-    if not df.empty:
+    if not payout_df.empty:
         # 0원인 사람은 제외
-        display_df = df[df['payout_amount'] > 0]
+        display_df = payout_df[payout_df['payout_amount'] > 0]
         
         if display_df.empty:
             st.info("주급 데이터가 없습니다.")
             return
+
+        # ---------------------------------------------------------
+        # [핵심] 팔로워 데이터와 병합 (Merge)
+        # ---------------------------------------------------------
+        if not follower_df.empty:
+            # 핸들 기준으로 팔로워 정보만 가져와서 합치기
+            # follower_df에서 handle과 followers 컬럼만 사용
+            merged_df = pd.merge(
+                display_df, 
+                follower_df[['handle', 'followers']], 
+                on='handle', 
+                how='left'
+            )
+            # 매칭 안 된 경우(팔로워 맵에 없는 사람) 0으로 처리
+            merged_df['followers'] = merged_df['followers'].fillna(0)
+            display_df = merged_df
 
         # 상단 요약 카드
         total_payout = display_df['payout_amount'].sum()
@@ -73,14 +89,13 @@ def render_payout_page(conn):
             axis=1
         )
         
-        # [수정됨] 팔로워 맵과 동일한 그라데이션 적용
+        # 팔로워 맵과 동일한 그라데이션 적용
         fig = px.treemap(
             display_df, 
             path=['category', 'chart_label'], 
             values='payout_amount', 
-            color='payout_amount', # 값에 따라 색상 변경
+            color='payout_amount', 
             custom_data=['name', 'handle'],
-            # 팔로워 맵과 동일한 복잡한 그라데이션 스케일
             color_continuous_scale=[(0.00, '#2E2B4E'), (0.05, '#353263'), (0.10, '#3F3C5C'), (0.15, '#464282'), (0.20, '#4A477A'), (0.25, '#4A5D91'), (0.30, '#4A6FA5'), (0.35, '#537CA8'), (0.40, '#5C8BAE'), (0.45, '#5C98AE'), (0.50, '#5E9CA8'), (0.55, '#5E9E94'), (0.60, '#5F9E7F'), (0.65, '#729E6F'), (0.70, '#859E5F'), (0.75, '#969E5F'), (0.80, '#A89E5F'), (0.85, '#AD905D'), (0.90, '#AE815C'), (0.95, '#AE6E5C'), (1.00, '#AE5C5C')],
             template="plotly_dark"
         )
@@ -115,16 +130,23 @@ def render_payout_page(conn):
 
         # 주급 순으로 정렬
         ranking_df = display_df.sort_values(by='payout_amount', ascending=False).reset_index(drop=True)
-        view_total = ranking_df['payout_amount'].sum()
         
         list_html = ""
         for index, row in ranking_df.iterrows():
             rank = index + 1
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
-            share_pct = (row['payout_amount'] / view_total * 100) if view_total > 0 else 0
             
+            # 바이오 정보 (없으면 기본 문구)
             bio_content = row['bio'] if row['bio'] else "수익 인증 상세 정보가 없습니다."
+            
+            # [NEW] 팔로워 수 표시 (데이터가 병합되었으므로 row['followers'] 사용 가능)
+            # 만약 팔로워 데이터가 없으면 0으로 나옴
+            follower_count = int(row['followers']) if 'followers' in row else 0
+            
+            # 팔로워 숫자를 K, M 단위로 변환하는 간단한 로직 (선택사항)
+            # 여기서는 그냥 콤마 포맷 사용
+            follower_text = f"{follower_count:,}"
 
             list_html += f"""
             <details {'open' if expand_view else ''}>
@@ -139,11 +161,9 @@ def render_payout_page(conn):
                             <div class="rank-handle">@{row['handle']}</div>
                         </div>
                         <div class="rank-extra">
-                        </div>
-                        <div class="rank-stats-group">
-                            <div class="rank-category">{row['category']}</div>
-                            <div class="rank-share">{share_pct:.1f}%</div>
-                            <div class="rank-followers">${int(row['payout_amount']):,}</div>
+                             </div>
+                        <div class="rank-stats-group" style="width: 200px;"> <div class="rank-category" style="background-color: #1F2937; color: #9CA3AF;">👥 {follower_text}</div>
+                            <div class="rank-followers" style="width: 80px; color: #10B981;">${int(row['payout_amount']):,}</div>
                         </div>
                     </div>
                 </summary>
