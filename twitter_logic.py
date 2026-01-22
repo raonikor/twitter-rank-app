@@ -1,32 +1,112 @@
-# twitter_logic.py
+# payout_logic.py
 import streamlit as st
-import streamlit.components.v1 as components
+import pandas as pd
+import plotly.express as px
+import numpy as np
 
-def render_twitter_page():
-    st.title("🐦 실시간 트위터 (Live Feed)")
-    st.caption("공식 계정의 최신 소식을 확인하세요.")
+# [수정] 인자 이름 앞에 언더바(_) 추가: _conn
+# 이렇게 하면 Streamlit이 캐싱할 때 이 객체는 무시합니다.
+@st.cache_data(ttl="30m")
+def get_payout_data(_conn): 
+    try:
+        df = _conn.read(worksheet="payouts", ttl="0") # 내부 변수명도 _conn으로 변경
+        
+        if df is not None and not df.empty:
+            # 숫자 변환 (콤마 제거 등 안전장치)
+            df['payout_amount'] = pd.to_numeric(
+                df['payout_amount'].astype(str).str.replace(',', ''), errors='coerce'
+            ).fillna(0)
+            
+            df['category'] = df['category'].fillna('미분류')
+            df['handle'] = df['handle'].astype(str)
+            if 'name' not in df.columns: df['name'] = df['handle']
+            else: df['name'] = df['name'].fillna(df['handle'])
+            
+        return df
+    except Exception as e:
+        # st.error(f"주급 데이터 오류: {e}") 
+        return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category'])
 
-    # 1. 보고 싶은 계정 설정 (기본값: raonikor)
-    # 다른 계정을 보고 싶다면 handle을 바꾸세요.
-    handle = "raonikor" 
+# 2. 주급 맵 렌더링
+def render_payout_page(conn):
+    st.title("💰 트위터 주급 맵 (Weekly Payout)")
+    st.caption("이번 주 트위터 수익 정산 현황")
+
+    # 호출할 때는 그냥 conn을 넘겨주면 됩니다.
+    df = get_payout_data(conn)
     
-    # 2. 트위터 타임라인 임베드 코드 (다크 모드 적용)
-    # height: 위젯 높이 (800px)
-    twitter_embed_code = f"""
-    <div style="display: flex; justify-content: center;">
-        <a class="twitter-timeline" 
-           data-theme="dark" 
-           data-width="600"
-           data-height="800"
-           href="https://twitter.com/{handle}?ref_src=twsrc%5Etfw">
-           Loading Tweets by @{handle}...
-        </a> 
-        <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
-    </div>
-    """
+    if not df.empty:
+        # 0원인 사람은 제외
+        display_df = df[df['payout_amount'] > 0]
+        
+        if display_df.empty:
+            st.info("주급 데이터가 없습니다.")
+            return
 
-    # 3. Streamlit에 HTML 렌더링
-    # scrolling=True로 해야 내부 스크롤이 자연스럽습니다.
-    components.html(twitter_embed_code, height=900, scrolling=True)
+        # 상단 요약
+        total_payout = display_df['payout_amount'].sum()
+        top_earner = display_df.loc[display_df['payout_amount'].idxmax()]
+        
+        col1, col2 = st.columns(2)
+        with col1: 
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">총 지급액 (Total Payout)</div>
+                <div class="metric-value">${total_payout:,.0f}</div>
+            </div>""", unsafe_allow_html=True)
+        with col2: 
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">주급 1위 (Top Earner)</div>
+                <div class="metric-value">{top_earner['name']} (${top_earner['payout_amount']:,.0f})</div>
+            </div>""", unsafe_allow_html=True)
 
-    st.info("💡 트위터 정책상 로그인이 되어 있지 않으면 일부 게시물이 보이지 않을 수 있습니다.")
+        st.write("")
+
+        # 트리맵 (돈이니까 초록색 테마)
+        display_df['chart_label'] = display_df['name'] + "<br><span style='font-size:0.8em;'>@" + display_df['handle'] + "</span>"
+        
+        fig = px.treemap(
+            display_df, 
+            path=['category', 'chart_label'], 
+            values='payout_amount', 
+            color='payout_amount',
+            custom_data=['name', 'handle'],
+            # 초록색 그라데이션
+            color_continuous_scale=[
+                (0.0, '#1B2E1E'), (0.2, '#2E5936'), (0.5, '#34A853'), (1.0, '#A8D67F')
+            ],
+            template="plotly_dark"
+        )
+        
+        fig.update_traces(
+            texttemplate='<b>%{customdata[0]}</b><br>$%{value:,.0f}',
+            textfont=dict(size=18, family="sans-serif", color="white"),
+            hovertemplate='<b>%{customdata[0]}</b> (@%{customdata[1]})<br>Payout: $%{value:,.0f}<extra></extra>',
+            marker=dict(line=dict(width=2, color='#000000')),
+            root_color="#000000"
+        )
+        
+        fig.update_layout(
+            margin=dict(t=0, l=0, r=0, b=0), 
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+            height=600, coloraxis_showscale=False
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # 리스트 (테이블)
+        st.subheader("📋 주급 랭킹")
+        st.dataframe(
+            display_df[['name', 'handle', 'category', 'payout_amount']].sort_values('payout_amount', ascending=False),
+            column_config={
+                "name": "이름",
+                "handle": "핸들",
+                "category": "카테고리",
+                "payout_amount": st.column_config.NumberColumn("주급 ($)", format="$%d")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+
+    else:
+        st.info("주급 데이터를 불러올 수 없습니다. 'payouts' 시트를 확인해주세요.")
