@@ -3,14 +3,12 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 
-# 1. 주급 데이터 가져오기 (캐싱 에러 방지를 위해 ttl 사용)
+# 1. 주급 데이터 가져오기
 def get_payout_data(conn): 
     try:
-        # 30분 캐시
         df = conn.read(worksheet="payouts", ttl="30m") 
         
         if df is not None and not df.empty:
-            # 숫자 변환 (콤마 제거)
             df['payout_amount'] = pd.to_numeric(
                 df['payout_amount'].astype(str).str.replace(',', ''), errors='coerce'
             ).fillna(0)
@@ -18,11 +16,9 @@ def get_payout_data(conn):
             df['category'] = df['category'].fillna('미분류')
             df['handle'] = df['handle'].astype(str).str.strip()
             
-            # 이름 없으면 핸들로 대체
             if 'name' not in df.columns: df['name'] = df['handle']
             else: df['name'] = df['name'].fillna(df['handle'])
             
-            # bio 컬럼 처리
             if 'bio' not in df.columns: df['bio'] = ""
             else: df['bio'] = df['bio'].fillna("")
             
@@ -30,28 +26,26 @@ def get_payout_data(conn):
     except Exception as e:
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category', 'bio'])
 
-# 2. 주급 맵 렌더링 (카테고리 필터 기능 추가됨)
-def render_payout_page(conn, follower_df, selected_category="전체보기"):
+# 2. 주급 맵 렌더링 (인자 추가: merge_categories)
+def render_payout_page(conn, follower_df, selected_category="전체보기", merge_categories=False):
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
     st.caption(f"이번 주 트위터 수익 정산 현황 - {selected_category}")
 
     payout_df = get_payout_data(conn)
     
     if not payout_df.empty:
-        # 0원인 사람은 제외
+        # 0원 제외
         display_df = payout_df[payout_df['payout_amount'] > 0]
         
-        # [NEW] 카테고리 필터링 적용
+        # 카테고리 필터링
         if selected_category != "전체보기":
             display_df = display_df[display_df['category'] == selected_category]
         
         if display_df.empty:
-            st.info(f"'{selected_category}' 카테고리에 해당하는 데이터가 없습니다.")
+            st.info(f"'{selected_category}' 데이터가 없습니다.")
             return
 
-        # ---------------------------------------------------------
-        # 팔로워 데이터와 병합 (Merge)
-        # ---------------------------------------------------------
+        # 팔로워 데이터 병합
         if not follower_df.empty:
             merged_df = pd.merge(
                 display_df, 
@@ -62,7 +56,7 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
             merged_df['followers'] = merged_df['followers'].fillna(0)
             display_df = merged_df
 
-        # 상단 요약 카드
+        # 상단 요약
         total_payout = display_df['payout_amount'].sum()
         top_earner = display_df.loc[display_df['payout_amount'].idxmax()]
         
@@ -83,16 +77,25 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
         st.write("")
 
         # ---------------------------------------------------------
-        # 1. 트리맵 차트
+        # 1. 트리맵 차트 (카테고리 통합 옵션 적용)
         # ---------------------------------------------------------
         display_df['chart_label'] = display_df.apply(
             lambda x: f"{str(x['name'])}<br><span style='font-size:0.7em; font-weight:normal;'>@{str(x['handle'])}</span>", 
             axis=1
         )
         
+        # [NEW] 통합 보기 로직
+        if merge_categories:
+            # 모든 데이터를 '전체'라는 하나의 그룹으로 묶음
+            display_df['root_group'] = "전체 (All)"
+            path_list = ['root_group', 'chart_label']
+        else:
+            # 기존 방식: 카테고리별 그룹핑
+            path_list = ['category', 'chart_label']
+
         fig = px.treemap(
             display_df, 
-            path=['category', 'chart_label'], 
+            path=path_list, 
             values='payout_amount', 
             color='payout_amount', 
             custom_data=['name', 'handle'],
