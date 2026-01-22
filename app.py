@@ -17,7 +17,7 @@ import follower_logic
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
 
-# 2. CSS 스타일 (뉴스 티커 스타일 추가됨)
+# 2. CSS 스타일
 st.markdown("""
     <style>
     /* 전체 테마 */
@@ -25,23 +25,28 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
     /* ------------------------------------------------------- */
-    /* [NEW] 뉴스 티커 (News Ticker) 스타일 */
+    /* [수정] 뉴스 티커 (News Ticker) - 화면 상단 고정 */
     /* ------------------------------------------------------- */
     .ticker-container {
+        position: fixed; /* 스크롤해도 고정 */
+        top: 0;
+        left: 0;
         width: 100%;
-        background-color: #16191E; /* 배경색 */
+        height: 50px; /* 티커 높이 고정 */
+        background-color: #16191E;
         border-bottom: 1px solid #2D3035;
         overflow: hidden;
         white-space: nowrap;
-        padding: 10px 0;
-        margin-bottom: 20px;
-        position: relative;
+        padding: 12px 0;
+        z-index: 999999; /* 다른 요소들보다 위에 표시 */
+        display: flex;
+        align-items: center;
     }
     
     .ticker-wrapper {
         display: inline-block;
         padding-left: 100%;
-        animation: ticker 30s linear infinite; /* 속도 조절 (초) */
+        animation: ticker 35s linear infinite; /* 속도 조절 */
     }
     
     .ticker-item {
@@ -49,18 +54,23 @@ st.markdown("""
         font-size: 14px;
         color: #E0E0E0;
         font-weight: 500;
-        padding-right: 50px; /* 항목 간 간격 */
+        padding-right: 60px; /* 항목 간격 */
     }
     
     .ticker-highlight {
         color: #10B981; /* 강조 색상 (녹색) */
         font-weight: 700;
-        margin-right: 5px;
+        margin-right: 6px;
     }
 
     @keyframes ticker {
         0% { transform: translate3d(0, 0, 0); }
         100% { transform: translate3d(-100%, 0, 0); }
+    }
+
+    /* [중요] 티커가 고정되면서 컨텐츠가 가려지지 않도록 메인 영역 상단 여백 추가 */
+    .main .block-container {
+        padding-top: 80px !important; /* 기존보다 더 아래로 밀기 */
     }
 
     /* ------------------------------------------------------- */
@@ -199,17 +209,14 @@ with menu_placeholder.container():
     menu = st.radio(" ", menu_options, label_visibility="collapsed")
 
 # ---------------------------------------------------------
-# [NEW] 뉴스 티커 렌더링 (메인 화면 상단)
+# [NEW] 뉴스 티커 (상단 고정)
 # ---------------------------------------------------------
-# 원하는 공지사항을 리스트에 추가하세요.
 ticker_messages = [
     "📢 <span class='ticker-highlight'>NOTICE</span> 트위터 팔로워 데이터는 매일 자정에 업데이트 됩니다.",
     "💰 <span class='ticker-highlight'>UPDATE</span> 이번 주 트위터 주급 정산 내역이 갱신되었습니다.",
     "🏆 <span class='ticker-highlight'>EVENT</span> 텔레그램 채널에서 진행 중인 이벤트를 확인하세요!",
-    "🚀 Raoni Map에 오신 것을 환영합니다. 왼쪽 메뉴에서 원하시는 기능을 선택해주세요."
+    "🚀 Raoni Map에 오신 것을 환영합니다."
 ]
-
-# 메시지를 HTML div로 변환
 ticker_items_html = "".join([f'<div class="ticker-item">{msg}</div>' for msg in ticker_messages])
 
 st.markdown(f"""
