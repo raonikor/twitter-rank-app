@@ -83,7 +83,7 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* [수정됨] 리더보드 리스트 스타일 */
+    /* 리더보드 리스트 스타일 */
     .ranking-row { 
         display: flex; align-items: center; 
         background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
@@ -101,11 +101,11 @@ st.markdown("""
     .rank-name { font-size: 15px; font-weight: 700; color: #FFFFFF !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
     .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;}
     
-    /* [수정됨] 요약 & 비고 1줄 배치 (안정성 강화) */
+    /* 요약 & 비고 1줄 배치 */
     .rank-extra { 
         flex-grow: 1; 
         min-width: 0; 
-        min-height: 24px; /* 최소 높이 보장 (내용 없어도 찌그러짐 방지) */
+        min-height: 24px;
         display: flex; 
         flex-direction: row; 
         align-items: center; 
@@ -113,21 +113,23 @@ st.markdown("""
         overflow: hidden;
     }
     
+    /* [수정됨] 1. 최근 관심 (밝은 주황색) */
     .rank-interest { 
         font-size: 13px; 
-        color: #FF5252 !important; /* 빨간색 */
+        color: #FF9100 !important; /* 밝은 주황색 */
         font-weight: 700; 
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
         margin-bottom: 0;
     }
     
+    /* [수정됨] 2. 비고 (밝은 라임색 버튼) */
     .rank-note { 
         font-size: 11px; 
-        color: #000000; 
-        background-color: #F59E0B; /* 노란색 */
+        color: #000000; /* 검은색 글씨 */
+        background-color: #C6FF00; /* 밝은 라임색 */
         padding: 2px 8px; 
         border-radius: 12px; 
-        font-weight: 600;
+        font-weight: 700;
         white-space: nowrap; 
         flex-shrink: 0; 
     }
@@ -159,7 +161,7 @@ def get_sheet_data():
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
             
-            # [중요] 모든 텍스트 컬럼 강제 초기화 (NaN -> 빈 문자열)
+            # [중요] 모든 텍스트 컬럼 강제 초기화
             cols_to_check = ['handle', 'name', 'category', 'recent_interest', 'note']
             for col in cols_to_check:
                 if col not in df.columns: df[col] = "" 
@@ -238,6 +240,7 @@ if menu == "트위터 팔로워 맵":
         st.write("")
 
         if not display_df.empty:
+            # 차트 라벨
             display_df['chart_label'] = display_df.apply(
                 lambda x: f"{str(x['name'])}<br><span style='font-size:0.7em; font-weight:normal;'>@{str(x['handle'])}</span>", 
                 axis=1
@@ -290,15 +293,12 @@ if menu == "트위터 팔로워 맵":
                 img_url = f"https://unavatar.io/twitter/{row['handle']}"
                 share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
                 
-                # 데이터 안전하게 가져오기 (여기서 99%의 에러가 차단됨)
                 recent_raw = clean_str(row.get('recent_interest', ''))
                 note_raw = clean_str(row.get('note', ''))
                 
-                # HTML 이스케이프 (특수문자 방어)
                 recent_safe = html.escape(recent_raw)
                 note_safe = html.escape(note_raw)
                 
-                # HTML 생성
                 interest_html = f"<div class='rank-interest'>{recent_safe}</div>" if recent_safe else ""
                 note_html = f"<span class='rank-note'>{note_safe}</span>" if note_safe else ""
                 
