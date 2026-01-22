@@ -6,7 +6,7 @@ import html
 
 def render_follower_page(conn, df):
     # ---------------------------------------------------------
-    # [CSS] 카테고리 버튼 스타일링 (알약 모양 버튼)
+    # [CSS] 카테고리 버튼 스타일링 (알약 모양)
     # ---------------------------------------------------------
     st.markdown("""
     <style>
@@ -71,23 +71,33 @@ def render_follower_page(conn, df):
         return
 
     # ---------------------------------------------------------
-    # [UI] 카테고리 선택 (메인 화면 상단 배치)
+    # [UI] 카테고리 선택 & 통합 보기 토글
     # ---------------------------------------------------------
     if 'category' in df.columns:
-        # '전체보기'를 맨 앞에, 나머지는 가나다순 정렬
         all_cats = ["전체보기"] + sorted(df['category'].dropna().unique().tolist())
     else:
         all_cats = ["전체보기"]
 
-    # 화면 분할 없이 꽉 차게 배치하거나, 오른쪽 여백을 둘 수 있음
-    st.write("카테고리 선택") # 라벨 명시
-    selected_category = st.radio(
-        "카테고리 선택",  # 실제로는 CSS로 숨김 처리되거나 위화감 없게 배치됨
-        all_cats, 
-        horizontal=True, 
-        label_visibility="collapsed",
-        key="follower_category_main"
-    )
+    # 화면 분할 (왼쪽: 카테고리 버튼 / 오른쪽: 통합 토글)
+    col_cat, col_opt = st.columns([0.8, 0.2])
+    
+    with col_cat:
+        st.write("카테고리 선택") # 라벨 명시
+        selected_category = st.radio(
+            "카테고리 선택", 
+            all_cats, 
+            horizontal=True, 
+            label_visibility="collapsed",
+            key="follower_category_main"
+        )
+        
+    with col_opt:
+        merge_categories = False
+        # '전체보기'일 때만 토글 버튼 표시
+        if selected_category == "전체보기":
+            st.write("") # 줄맞춤용 공백
+            st.write("") 
+            merge_categories = st.toggle("통합 보기", value=False, key="follower_merge_toggle")
 
     st.caption(f"Twitter Follower Map - {selected_category}")
     st.write("") 
@@ -123,7 +133,7 @@ def render_follower_page(conn, df):
     st.write("")
 
     # ---------------------------------------------------------
-    # 트리맵 차트
+    # 2. 트리맵 차트 (통합 보기 로직 추가)
     # ---------------------------------------------------------
     display_df['chart_label'] = display_df.apply(
         lambda x: f"{str(x['name'])}<br><span style='font-size:0.7em; font-weight:normal;'>@{str(x['handle'])}</span>", 
@@ -131,9 +141,16 @@ def render_follower_page(conn, df):
     )
     display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
 
+    # [NEW] 통합 보기 로직
+    if merge_categories:
+        display_df['root_group'] = "전체 (All)"
+        path_list = ['root_group', 'chart_label']
+    else:
+        path_list = ['category', 'chart_label']
+
     fig = px.treemap(
         display_df, 
-        path=['category', 'chart_label'], 
+        path=path_list, 
         values='followers', 
         color='log_followers',
         custom_data=['name'], 
@@ -163,7 +180,7 @@ def render_follower_page(conn, df):
     st.write("")
     
     # ---------------------------------------------------------
-    # 리더보드 리스트
+    # 3. 리더보드 리스트
     # ---------------------------------------------------------
     col_head, col_toggle = st.columns([1, 0.3])
     with col_head:
