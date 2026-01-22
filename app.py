@@ -426,6 +426,8 @@ if menu == "트위터 팔로워 맵":
                 st.markdown(list_html, unsafe_allow_html=True)
     else: st.info("데이터가 없습니다.")
 
+# app.py 의 [PAGE 2] 부분을 아래 코드로 교체
+
 # ==========================================
 # [PAGE 2] 트위터 주급 맵 (NEW)
 # ==========================================
@@ -434,7 +436,7 @@ elif menu == "트위터 주급 맵":
     if 'df' not in locals() or df.empty:
         df = get_sheet_data()
     
-    # [수정] 사이드바에 있던 토글 제거 -> 이제 payout_logic.py 내부에서 처리하므로 인자 제거
+    # [수정] merge_categories 인자 삭제 (이제 payout_logic 안에서 알아서 처리함)
     payout_logic.render_payout_page(conn, df, selected_category)
 
 # ==========================================
@@ -470,3 +472,4 @@ elif menu == "관리자 페이지" and is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 구글 시트 데이터를 즉시 새로고침합니다.")
+
