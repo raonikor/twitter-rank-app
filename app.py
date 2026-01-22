@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 import market_logic 
 import visitor_logic
 import event_logic 
-import twitter_logic # [NEW] 트위터 로직 추가
+import twitter_logic
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
@@ -84,8 +84,42 @@ st.markdown("""
     .metric-delta { font-size: 14px; font-weight: 500; margin-top: 5px; }
     .delta-up { color: #10B981; } .delta-down { color: #EF4444; }
     
-    .ranking-row { display: flex; align-items: center; justify-content: space-between; background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px; transition: all 0.2s ease; }
-    .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
+    /* [수정] 리더보드 스타일 (Accordion) */
+    /* summary 태그의 기본 삼각형 숨기기 */
+    details > summary { list-style: none; outline: none; cursor: pointer; }
+    details > summary::-webkit-details-marker { display: none; }
+    
+    .ranking-row { 
+        display: flex; align-items: center; justify-content: space-between; 
+        background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
+        padding: 8px 12px; margin-bottom: 0px; /* details 안에 들어갈거라 마진 제거 */
+        transition: all 0.2s ease; 
+    }
+    .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; }
+    
+    /* 클릭 시 열리는 트윗 박스 스타일 */
+    .tweet-box {
+        background-color: #15171B; /* 더 어두운 배경 */
+        border: 1px solid #2D3035;
+        border-top: none; /* 위쪽 경계선 제거 (자연스럽게 연결) */
+        border-bottom-left-radius: 6px;
+        border-bottom-right-radius: 6px;
+        padding: 15px 20px;
+        margin-bottom: 8px;
+        margin-top: -2px; /* 살짝 올려서 붙이기 */
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .tweet-header { font-size: 11px; color: #10B981; font-weight: 700; margin-bottom: 5px; display: flex; align-items: center; }
+    .tweet-content { font-size: 14px; color: #E5E7EB; line-height: 1.5; font-style: italic; }
+    .tweet-link-btn {
+        display: inline-block; margin-top: 10px; font-size: 11px; 
+        color: #3B82F6; text-decoration: none; border: 1px solid #2D3035; 
+        padding: 3px 8px; border-radius: 12px; transition: all 0.2s;
+    }
+    .tweet-link-btn:hover { background-color: #1C1F26; color: #60A5FA; }
+
     .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 25px; }
     .rank-img { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 10px; object-fit: cover; }
     .rank-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
@@ -119,15 +153,19 @@ def get_sheet_data():
             df['handle'] = df['handle'].astype(str)
             if 'name' not in df.columns: df['name'] = df['handle'] 
             else: df['name'] = df['name'].fillna(df['handle'])
+            
+            # [NEW] last_tweet 컬럼 가져오기 (없으면 빈칸 처리)
+            if 'last_tweet' not in df.columns: df['last_tweet'] = ""
+            else: df['last_tweet'] = df['last_tweet'].fillna("")
+            
         return df
-    except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category'])
+    except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'last_tweet'])
 
 # 4. 사이드바 구성
 with st.sidebar:
     st.markdown("### **Raoni Map**")
     
     st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
-    # [NEW] 실시간 트위터 메뉴 추가
     menu = st.radio(" ", ["트위터 팔로워 맵", "실시간 트위터", "지수 비교 (Indices)", "텔레그램 이벤트"], label_visibility="collapsed")
     
     st.divider()
@@ -222,6 +260,7 @@ if menu == "트위터 팔로워 맵":
 
             st.write("")
             st.subheader("🏆 팔로워 순위 (Leaderboard)")
+            st.caption("카드를 클릭하면 최신 트윗을 볼 수 있습니다.") # 안내 문구 추가
             
             ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
             view_total = ranking_df['followers'].sum()
@@ -233,24 +272,39 @@ if menu == "트위터 팔로워 맵":
                 img_url = f"https://unavatar.io/twitter/{row['handle']}"
                 share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
                 
+                # [NEW] 최신 트윗 내용 가져오기
+                tweet_content = row['last_tweet'] if row['last_tweet'] else "최신 트윗 정보가 없습니다."
+                
+                # [NEW] details 태그를 활용한 클릭 확장 기능
                 list_html += f"""
-                <div class="ranking-row">
-                    <div class="rank-num">{medal}</div>
-                    <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
-                    <div class="rank-info">
-                        <div class="rank-name">{row['name']}</div>
-                        <div class="rank-handle">@{row['handle']}</div>
+                <details>
+                    <summary>
+                        <div class="ranking-row">
+                            <div class="rank-num">{medal}</div>
+                            <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
+                            <div class="rank-info">
+                                <div class="rank-name">{row['name']}</div>
+                                <div class="rank-handle">@{row['handle']}</div>
+                            </div>
+                            <div class="rank-category">{row['category']}</div>
+                            <div class="rank-share">{share_pct:.1f}%</div>
+                            <div class="rank-followers">{int(row['followers']):,}</div>
+                        </div>
+                    </summary>
+                    <div class="tweet-box">
+                        <div class="tweet-header">📢 LATEST TWEET</div>
+                        <div class="tweet-content">"{tweet_content}"</div>
+                        <a href="https://twitter.com/{row['handle']}" target="_blank" class="tweet-link-btn">
+                            트위터 바로가기 ↗
+                        </a>
                     </div>
-                    <div class="rank-category">{row['category']}</div>
-                    <div class="rank-share">{share_pct:.1f}%</div>
-                    <div class="rank-followers">{int(row['followers']):,}</div>
-                </div>
+                </details>
                 """
             with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
     else: st.info("데이터가 없습니다.")
 
 # ==========================================
-# [PAGE 2] 실시간 트위터 (NEW)
+# [PAGE 2] 실시간 트위터
 # ==========================================
 elif menu == "실시간 트위터":
     twitter_logic.render_twitter_page()
