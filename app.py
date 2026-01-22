@@ -12,7 +12,7 @@ import visitor_logic
 import event_logic 
 import twitter_logic
 import payout_logic
-import follower_logic # (팔로워 맵 모듈)
+import follower_logic
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
@@ -24,34 +24,65 @@ st.markdown("""
     .stApp { background-color: #0F1115; color: #FFFFFF; }
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
-    /* 사이드바 메뉴 스타일 */
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] { gap: 2px; }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label > div:first-child { display: none !important; }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
-        display: flex; width: 100%; padding: 6px 12px !important;
-        border-radius: 8px !important; border: none !important;
-        background-color: transparent; transition: all 0.2s ease; margin-bottom: 1px;
+    /* ------------------------------------------------------- */
+    /* [수정] 사이드바 메뉴 스타일 (세로형 알약 버튼) */
+    /* ------------------------------------------------------- */
+    
+    /* 라디오 버튼 그룹 컨테이너: 세로 정렬 강제 */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] { 
+        display: flex;
+        flex-direction: column !important; /* 세로 정렬 */
+        gap: 6px; /* 버튼 사이 간격 */
     }
+    
+    /* 기본 라디오 버튼(동그라미) 숨기기 */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label > div:first-child { 
+        display: none !important; 
+    }
+    
+    /* 버튼(Label) 스타일 */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
+        display: flex; 
+        width: 100%; /* 너비 꽉 채우기 */
+        padding: 10px 16px !important;
+        border-radius: 12px !important; 
+        border: 1px solid transparent !important;
+        background-color: transparent; 
+        transition: all 0.2s ease; 
+        margin-bottom: 0px;
+        align-items: center;
+    }
+
+    /* 텍스트 스타일 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label div,
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label p,
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label span {
-        color: #B0B3B8 !important; font-size: 14px; font-weight: 500;
-    }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover { background-color: #282A2C !important; }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover p,
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover span,
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover div { 
-        color: #FFFFFF !important; 
-    }
-    /* 선택된 메뉴 스타일 */
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) { 
-        background-color: #004A77 !important; 
-    }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) * { 
-        color: #FFFFFF !important; font-weight: 700; 
+        color: #9CA3AF !important; /* 기본 회색 */
+        font-size: 14px; 
+        font-weight: 500;
     }
 
-    /* 사이드바 헤더 및 위젯 */
+    /* [호버 상태] 마우스 올렸을 때 */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover { 
+        background-color: #282A2C !important; 
+    }
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover p { 
+        color: #FFFFFF !important; 
+    }
+    
+    /* [선택된 상태] 스타일 (파란색 배경 + 흰색 글씨) */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) { 
+        background-color: #004A77 !important; 
+        border: 1px solid #00568C !important;
+    }
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) p { 
+        color: #FFFFFF !important; 
+        font-weight: 700; 
+    }
+
+    /* ------------------------------------------------------- */
+    /* 기타 UI 스타일 (기존 유지) */
+    /* ------------------------------------------------------- */
     .sidebar-header { font-size: 11px; font-weight: 700; color: #E0E0E0; margin-top: 15px; margin-bottom: 5px; padding-left: 8px; text-transform: uppercase; opacity: 0.9; }
     .visitor-box { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 12px; padding: 15px; margin-top: 20px; text-align: center; }
     .vis-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1px; }
@@ -59,8 +90,6 @@ st.markdown("""
     .vis-today { color: #10B981; }
     .vis-total { color: #E5E7EB; }
     .vis-divider { height: 1px; background-color: #2D3035; margin: 8px 0; }
-    
-    /* 소셜 링크 */
     .social-box { display: flex; align-items: center; background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 12px; padding: 10px 15px; margin-top: 8px; text-decoration: none !important; transition: all 0.2s ease; cursor: pointer; }
     .social-box:hover { border-color: #10B981; background-color: #252830; transform: translateX(2px); }
     .social-img { width: 32px; height: 32px; border-radius: 50%; margin-right: 12px; border: 2px solid #2D3035; object-fit: cover; }
@@ -68,8 +97,6 @@ st.markdown("""
     .social-label { font-size: 10px; color: #9CA3AF; margin-bottom: 0px; line-height: 1.2;}
     .social-name { font-size: 13px; font-weight: 700; color: #FFFFFF; line-height: 1.2;}
     .social-handle { font-size: 11px; color: #6B7280; }
-
-    /* 이벤트, 메트릭 카드 */
     .event-card-link { text-decoration: none !important; }
     .event-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 10px; padding: 20px; margin-bottom: 12px; transition: all 0.2s ease; display: block; }
     .event-card:hover { border-color: #10B981; background-color: #252830; transform: translateY(-2px); }
@@ -81,8 +108,6 @@ st.markdown("""
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
-    
-    /* 리더보드 (아코디언) */
     details > summary { list-style: none !important; outline: none !important; cursor: pointer; display: block !important; }
     details > summary::-webkit-details-marker { display: none !important; }
     details > summary::marker { display: none !important; content: ""; }
@@ -172,7 +197,6 @@ if menu == "트위터 팔로워 맵":
 # ==========================================
 elif menu == "트위터 주급 맵":
     if 'df' not in locals() or df.empty: df = get_sheet_data()
-    # [수정] 인자를 2개만 전달! (conn, df)
     payout_logic.render_payout_page(conn, df)
 
 # ==========================================
