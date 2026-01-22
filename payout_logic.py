@@ -16,7 +16,7 @@ def get_payout_data(conn):
             ).fillna(0)
             
             df['category'] = df['category'].fillna('미분류')
-            df['handle'] = df['handle'].astype(str).str.strip() # 공백 제거
+            df['handle'] = df['handle'].astype(str).str.strip()
             
             # 이름 없으면 핸들로 대체
             if 'name' not in df.columns: df['name'] = df['handle']
@@ -30,10 +30,10 @@ def get_payout_data(conn):
     except Exception as e:
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category', 'bio'])
 
-# 2. 주급 맵 렌더링 (follower_df 인자 추가됨)
-def render_payout_page(conn, follower_df):
+# 2. 주급 맵 렌더링 (카테고리 필터 기능 추가됨)
+def render_payout_page(conn, follower_df, selected_category="전체보기"):
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
-    st.caption("이번 주 트위터 수익 정산 현황")
+    st.caption(f"이번 주 트위터 수익 정산 현황 - {selected_category}")
 
     payout_df = get_payout_data(conn)
     
@@ -41,23 +41,24 @@ def render_payout_page(conn, follower_df):
         # 0원인 사람은 제외
         display_df = payout_df[payout_df['payout_amount'] > 0]
         
+        # [NEW] 카테고리 필터링 적용
+        if selected_category != "전체보기":
+            display_df = display_df[display_df['category'] == selected_category]
+        
         if display_df.empty:
-            st.info("주급 데이터가 없습니다.")
+            st.info(f"'{selected_category}' 카테고리에 해당하는 데이터가 없습니다.")
             return
 
         # ---------------------------------------------------------
-        # [핵심] 팔로워 데이터와 병합 (Merge)
+        # 팔로워 데이터와 병합 (Merge)
         # ---------------------------------------------------------
         if not follower_df.empty:
-            # 핸들 기준으로 팔로워 정보만 가져와서 합치기
-            # follower_df에서 handle과 followers 컬럼만 사용
             merged_df = pd.merge(
                 display_df, 
                 follower_df[['handle', 'followers']], 
                 on='handle', 
                 how='left'
             )
-            # 매칭 안 된 경우(팔로워 맵에 없는 사람) 0으로 처리
             merged_df['followers'] = merged_df['followers'].fillna(0)
             display_df = merged_df
 
@@ -89,7 +90,6 @@ def render_payout_page(conn, follower_df):
             axis=1
         )
         
-        # 팔로워 맵과 동일한 그라데이션 적용
         fig = px.treemap(
             display_df, 
             path=['category', 'chart_label'], 
@@ -128,7 +128,6 @@ def render_payout_page(conn, follower_df):
         with col_toggle:
             expand_view = st.toggle("전체 펼치기", value=False, key="payout_toggle")
 
-        # 주급 순으로 정렬
         ranking_df = display_df.sort_values(by='payout_amount', ascending=False).reset_index(drop=True)
         
         list_html = ""
@@ -137,15 +136,9 @@ def render_payout_page(conn, follower_df):
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
             
-            # 바이오 정보 (없으면 기본 문구)
             bio_content = row['bio'] if row['bio'] else "수익 인증 상세 정보가 없습니다."
             
-            # [NEW] 팔로워 수 표시 (데이터가 병합되었으므로 row['followers'] 사용 가능)
-            # 만약 팔로워 데이터가 없으면 0으로 나옴
             follower_count = int(row['followers']) if 'followers' in row else 0
-            
-            # 팔로워 숫자를 K, M 단위로 변환하는 간단한 로직 (선택사항)
-            # 여기서는 그냥 콤마 포맷 사용
             follower_text = f"{follower_count:,}"
 
             list_html += f"""
@@ -161,8 +154,9 @@ def render_payout_page(conn, follower_df):
                             <div class="rank-handle">@{row['handle']}</div>
                         </div>
                         <div class="rank-extra">
-                             </div>
-                        <div class="rank-stats-group" style="width: 200px;"> <div class="rank-category" style="background-color: #1F2937; color: #9CA3AF;">👥 {follower_text}</div>
+                        </div>
+                        <div class="rank-stats-group" style="width: 200px;">
+                            <div class="rank-category" style="background-color: #1F2937; color: #9CA3AF;">👥 {follower_text}</div>
                             <div class="rank-followers" style="width: 80px; color: #10B981;">${int(row['payout_amount']):,}</div>
                         </div>
                     </div>
