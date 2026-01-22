@@ -14,7 +14,7 @@ import twitter_logic
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
 
-# 2. CSS 스타일 (레이아웃 깨짐 방지 & 텍스트 색상 강제 지정)
+# 2. CSS 스타일 (깨짐 방지용 강력한 Flexbox 적용)
 st.markdown("""
     <style>
     /* 전체 테마 */
@@ -82,7 +82,7 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* [수정됨] 리더보드 레이아웃 고정 */
+    /* [수정됨] 리더보드 레이아웃 고정 (Flexbox) */
     .ranking-row { 
         display: flex; 
         align-items: center; 
@@ -92,28 +92,28 @@ st.markdown("""
         padding: 10px 15px; 
         margin-bottom: 6px; 
         transition: all 0.2s ease; 
-        /* 요소 간 간격 조절 */
-        gap: 15px;
+        gap: 15px; /* 아이템 간 간격 */
     }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
-    /* 1. 등수 & 이미지 (고정폭) */
+    /* 1. 등수 & 이미지 (고정폭 80px) */
     .rank-col-1 { display: flex; align-items: center; width: 80px; flex-shrink: 0; }
     .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 30px; text-align: center; margin-right: 5px; }
     .rank-img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #2D3035; object-fit: cover; background-color: #333; }
     
-    /* 2. 이름 & 핸들 (고정폭) */
+    /* 2. 이름 & 핸들 (고정폭 150px) */
     .rank-info { width: 150px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
-    .rank-name { font-size: 15px; font-weight: 700; color: #FFFFFF !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+    .rank-name { font-size: 15px; font-weight: 700; color: #FFFFFF !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+    .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;}
     
-    /* 3. 최근관심 & 비고 (남은 공간 차지) */
+    /* 3. 최근관심 & 비고 (남은 공간 모두 차지) */
     .rank-extra { 
         flex-grow: 1; 
-        min-width: 0; /* Flexbox 내에서 말줄임표 작동하게 함 */
+        min-width: 0; /* Flexbox 내 말줄임표 작동 필수 속성 */
         display: flex; 
         flex-direction: column; 
         justify-content: center;
+        overflow: hidden;
     }
     .rank-interest { 
         font-size: 13px; color: #E0E7FF; font-weight: 500;
@@ -125,7 +125,7 @@ st.markdown("""
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* 4. 통계 정보 (우측 정렬 고정폭) */
+    /* 4. 통계 정보 (고정폭 180px, 우측 정렬) */
     .rank-stats-group { 
         display: flex; align-items: center; justify-content: flex-end; width: 180px; flex-shrink: 0; 
     }
@@ -133,20 +133,20 @@ st.markdown("""
     .rank-share { font-size: 13px; font-weight: 700; color: #10B981; width: 50px; text-align: right; margin-right: 5px; }
     .rank-followers { font-size: 13px; font-weight: 600; color: #E5E7EB; width: 70px; text-align: right; }
     
+    /* 모바일 대응 (좁은 화면에서는 일부 숨김) */
     @media (max-width: 800px) { 
         .rank-category { display: none; } 
         .rank-info { width: 100px; }
         .rank-stats-group { width: 120px; }
+        .rank-extra { display: none; } /* 모바일엔 공간 부족으로 숨김 */
     }
     
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
-    .js-plotly-plot .plotly .main-svg g.shapelayer path { transition: filter 0.2s ease; cursor: pointer; }
-    .js-plotly-plot .plotly .main-svg g.shapelayer path:hover { filter: brightness(1.2) !important; opacity: 1 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 로드
+# 3. 데이터 로드 (에러 방지 강화)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # [모듈 사용] 방문자 수 계산
@@ -157,24 +157,24 @@ def get_sheet_data():
     try:
         df = conn.read(ttl="0") 
         if df is not None and not df.empty:
-            # 1. 숫자 데이터 처리 (에러 방지)
+            # 1. 숫자 변환 (팔로워)
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
             
-            # 2. 문자열 데이터 처리 (TypeError 방지 - 모든 텍스트 컬럼 강제 변환)
-            # 없는 컬럼은 만들고, 비어있으면 빈 문자열로 채움
+            # 2. 필수 컬럼 및 문자열 강제 변환 (TypeError 방지)
             cols_to_check = ['category', 'handle', 'name', 'recent_interest', 'note']
             for col in cols_to_check:
                 if col not in df.columns:
-                    df[col] = ''
+                    df[col] = '' # 없으면 빈칸으로 생성
+                # 핵심: 무조건 문자열로 변환 (NaN -> "" -> "nan" 방지)
                 df[col] = df[col].fillna('').astype(str)
             
-            # 이름이 없으면 핸들로 채우기
+            # 이름 비어있으면 핸들로 대체
             mask = df['name'] == ''
             df.loc[mask, 'name'] = df.loc[mask, 'handle']
             
         return df
-    except Exception as e:
-        # 에러 발생 시 빈 데이터프레임 반환 (화면이 죽는 것 방지)
+    except Exception:
+        # 에러나면 빈 데이터프레임 리턴 (화면 터짐 방지)
         return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'recent_interest', 'note'])
 
 # 4. 사이드바 구성
@@ -210,7 +210,6 @@ with st.sidebar:
                 <div class="social-name">Raoni</div>
             </div>
         </a>
-        
         <a href="https://t.me/Raoni1" target="_blank" class="social-box">
             <img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" class="social-img" style="padding:2px; background:white;">
             <div class="social-info">
@@ -245,7 +244,7 @@ if menu == "트위터 팔로워 맵":
         st.write("")
 
         if not display_df.empty:
-            # [에러 방지] 문자열 결합 전 강제 형변환 보장
+            # [에러 방지] 문자열 결합 전 강제 형변환 (한번 더 안전장치)
             display_df['chart_label'] = display_df['name'].astype(str) + "<br><span style='font-size:0.7em; font-weight:normal;'>@" + display_df['handle'].astype(str) + "</span>"
             display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
 
@@ -288,9 +287,9 @@ if menu == "트위터 팔로워 맵":
                 img_url = f"https://unavatar.io/twitter/{row['handle']}"
                 share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
                 
-                # 데이터 안전하게 가져오기
-                recent = str(row['recent_interest']) if row['recent_interest'] else ""
-                note = str(row['note']) if row['note'] else ""
+                # 데이터 안전하게 가져오기 (문자열 변환)
+                recent = str(row['recent_interest']).strip()
+                note = str(row['note']).strip()
                 
                 interest_html = f"👀 {recent}" if recent else ""
                 note_html = f"📝 {note}" if note else ""
