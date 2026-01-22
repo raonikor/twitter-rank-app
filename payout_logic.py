@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 
-# 1. 주급 데이터 가져오기 (캐싱 에러 방지를 위해 ttl 사용)
+# 1. 주급 데이터 가져오기
 def get_payout_data(conn): 
     try:
         # 30분 캐시
@@ -30,7 +30,7 @@ def get_payout_data(conn):
     except Exception as e:
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category', 'bio'])
 
-# 2. 주급 맵 렌더링 (follower_df 인자 추가됨)
+# 2. 주급 맵 렌더링 (인자: conn, follower_df 단 2개!)
 def render_payout_page(conn, follower_df):
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
     st.caption("이번 주 트위터 수익 정산 현황")
@@ -41,23 +41,52 @@ def render_payout_page(conn, follower_df):
         # 0원인 사람은 제외
         display_df = payout_df[payout_df['payout_amount'] > 0]
         
+        # ---------------------------------------------------------
+        # [UI] 메인 화면 컨트롤러 (가로형 카테고리 버튼)
+        # ---------------------------------------------------------
+        all_cats = ["전체보기"] + sorted(display_df['category'].unique().tolist())
+        
+        # 화면 분할 (왼쪽: 카테고리 버튼 / 오른쪽: 통합 토글)
+        col_cat, col_opt = st.columns([0.8, 0.2])
+        
+        with col_cat:
+            # 팔로워 맵과 동일한 스타일 (가로형)
+            selected_category = st.radio(
+                "카테고리 선택", 
+                all_cats, 
+                horizontal=True, 
+                label_visibility="collapsed",
+                key="payout_category_main"
+            )
+            
+        with col_opt:
+            merge_categories = False
+            # '전체보기'일 때만 통합 토글 표시
+            if selected_category == "전체보기":
+                merge_categories = st.toggle("통합 보기", value=False, key="payout_merge_toggle")
+
+        st.write("") # 간격 추가
+
+        # ---------------------------------------------------------
+        # 데이터 필터링
+        # ---------------------------------------------------------
+        if selected_category != "전체보기":
+            display_df = display_df[display_df['category'] == selected_category]
+        
         if display_df.empty:
-            st.info("주급 데이터가 없습니다.")
+            st.info(f"'{selected_category}' 데이터가 없습니다.")
             return
 
         # ---------------------------------------------------------
         # [핵심] 팔로워 데이터와 병합 (Merge)
         # ---------------------------------------------------------
         if not follower_df.empty:
-            # 핸들 기준으로 팔로워 정보만 가져와서 합치기
-            # follower_df에서 handle과 followers 컬럼만 사용
             merged_df = pd.merge(
                 display_df, 
                 follower_df[['handle', 'followers']], 
                 on='handle', 
                 how='left'
             )
-            # 매칭 안 된 경우(팔로워 맵에 없는 사람) 0으로 처리
             merged_df['followers'] = merged_df['followers'].fillna(0)
             display_df = merged_df
 
@@ -89,13 +118,17 @@ def render_payout_page(conn, follower_df):
             axis=1
         )
         
-        # 팔로워 맵과 동일한 그라데이션 적용
+        # 통합 보기 로직
+        path_list = ['root_group', 'chart_label'] if merge_categories else ['category', 'chart_label']
+        if merge_categories: display_df['root_group'] = "전체 (All)"
+        
         fig = px.treemap(
             display_df, 
-            path=['category', 'chart_label'], 
+            path=path_list, 
             values='payout_amount', 
             color='payout_amount', 
             custom_data=['name', 'handle'],
+            # 팔로워 맵과 동일한 그라데이션
             color_continuous_scale=[(0.00, '#2E2B4E'), (0.05, '#353263'), (0.10, '#3F3C5C'), (0.15, '#464282'), (0.20, '#4A477A'), (0.25, '#4A5D91'), (0.30, '#4A6FA5'), (0.35, '#537CA8'), (0.40, '#5C8BAE'), (0.45, '#5C98AE'), (0.50, '#5E9CA8'), (0.55, '#5E9E94'), (0.60, '#5F9E7F'), (0.65, '#729E6F'), (0.70, '#859E5F'), (0.75, '#969E5F'), (0.80, '#A89E5F'), (0.85, '#AD905D'), (0.90, '#AE815C'), (0.95, '#AE6E5C'), (1.00, '#AE5C5C')],
             template="plotly_dark"
         )
@@ -128,7 +161,7 @@ def render_payout_page(conn, follower_df):
         with col_toggle:
             expand_view = st.toggle("전체 펼치기", value=False, key="payout_toggle")
 
-        # 주급 순으로 정렬
+        # 주급 순 정렬
         ranking_df = display_df.sort_values(by='payout_amount', ascending=False).reset_index(drop=True)
         
         list_html = ""
@@ -137,15 +170,11 @@ def render_payout_page(conn, follower_df):
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
             
-            # 바이오 정보 (없으면 기본 문구)
+            # 바이오 정보
             bio_content = row['bio'] if row['bio'] else "수익 인증 상세 정보가 없습니다."
             
-            # [NEW] 팔로워 수 표시 (데이터가 병합되었으므로 row['followers'] 사용 가능)
-            # 만약 팔로워 데이터가 없으면 0으로 나옴
+            # 팔로워 수 (데이터 병합됨)
             follower_count = int(row['followers']) if 'followers' in row else 0
-            
-            # 팔로워 숫자를 K, M 단위로 변환하는 간단한 로직 (선택사항)
-            # 여기서는 그냥 콤마 포맷 사용
             follower_text = f"{follower_count:,}"
 
             list_html += f"""
@@ -162,7 +191,8 @@ def render_payout_page(conn, follower_df):
                         </div>
                         <div class="rank-extra">
                              </div>
-                        <div class="rank-stats-group" style="width: 200px;"> <div class="rank-category" style="background-color: #1F2937; color: #9CA3AF;">👥 {follower_text}</div>
+                        <div class="rank-stats-group" style="width: 200px;"> 
+                            <div class="rank-category" style="background-color: #1F2937; color: #9CA3AF;">👥 {follower_text}</div>
                             <div class="rank-followers" style="width: 80px; color: #10B981;">${int(row['payout_amount']):,}</div>
                         </div>
                     </div>
