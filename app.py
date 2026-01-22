@@ -12,7 +12,7 @@ import visitor_logic
 import event_logic 
 import twitter_logic
 import payout_logic
-import follower_logic # [NEW] 모듈 추가
+import follower_logic # (팔로워 맵 모듈)
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
@@ -59,6 +59,8 @@ st.markdown("""
     .vis-today { color: #10B981; }
     .vis-total { color: #E5E7EB; }
     .vis-divider { height: 1px; background-color: #2D3035; margin: 8px 0; }
+    
+    /* 소셜 링크 */
     .social-box { display: flex; align-items: center; background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 12px; padding: 10px 15px; margin-top: 8px; text-decoration: none !important; transition: all 0.2s ease; cursor: pointer; }
     .social-box:hover { border-color: #10B981; background-color: #252830; transform: translateX(2px); }
     .social-img { width: 32px; height: 32px; border-radius: 50%; margin-right: 12px; border: 2px solid #2D3035; object-fit: cover; }
@@ -163,14 +165,14 @@ with menu_placeholder.container():
 # ==========================================
 if menu == "트위터 팔로워 맵":
     if 'df' not in locals() or df.empty: df = get_sheet_data()
-    # [수정] 모듈 호출 (인자: conn, df)
     follower_logic.render_follower_page(conn, df)
 
 # ==========================================
-# [PAGE 2] 트위터 주급 맵
+# [PAGE 2] 트위터 주급 맵 (NEW)
 # ==========================================
 elif menu == "트위터 주급 맵":
     if 'df' not in locals() or df.empty: df = get_sheet_data()
+    # [수정] 인자를 2개만 전달! (conn, df)
     payout_logic.render_payout_page(conn, df)
 
 # ==========================================
