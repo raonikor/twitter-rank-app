@@ -26,8 +26,8 @@ def get_payout_data(conn):
     except Exception as e:
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category', 'bio'])
 
-# 2. 주급 맵 렌더링 (인자 추가: merge_categories)
-def render_payout_page(conn, follower_df, selected_category="전체보기", merge_categories=False):
+# 2. 주급 맵 렌더링 (merge_categories 인자 제거 - 내부에서 처리)
+def render_payout_page(conn, follower_df, selected_category="전체보기"):
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
     st.caption(f"이번 주 트위터 수익 정산 현황 - {selected_category}")
 
@@ -56,7 +56,7 @@ def render_payout_page(conn, follower_df, selected_category="전체보기", merg
             merged_df['followers'] = merged_df['followers'].fillna(0)
             display_df = merged_df
 
-        # 상단 요약
+        # 상단 요약 카드
         total_payout = display_df['payout_amount'].sum()
         top_earner = display_df.loc[display_df['payout_amount'].idxmax()]
         
@@ -77,20 +77,30 @@ def render_payout_page(conn, follower_df, selected_category="전체보기", merg
         st.write("")
 
         # ---------------------------------------------------------
-        # 1. 트리맵 차트 (카테고리 통합 옵션 적용)
+        # [NEW] 통합 보기 토글 버튼 (차트 위로 이동)
+        # ---------------------------------------------------------
+        merge_categories = False
+        
+        # '전체보기' 일 때만 버튼 표시
+        if selected_category == "전체보기":
+            # 오른쪽 정렬을 위해 컬럼 분할 (빈 공간 : 버튼 공간)
+            _, col_toggle = st.columns([0.8, 0.2])
+            with col_toggle:
+                # toggle_payout_view 키를 지정해 상태 유지
+                merge_categories = st.toggle("카테고리 통합 보기", value=False, key="toggle_payout_view")
+
+        # ---------------------------------------------------------
+        # 1. 트리맵 차트
         # ---------------------------------------------------------
         display_df['chart_label'] = display_df.apply(
             lambda x: f"{str(x['name'])}<br><span style='font-size:0.7em; font-weight:normal;'>@{str(x['handle'])}</span>", 
             axis=1
         )
         
-        # [NEW] 통합 보기 로직
         if merge_categories:
-            # 모든 데이터를 '전체'라는 하나의 그룹으로 묶음
             display_df['root_group'] = "전체 (All)"
             path_list = ['root_group', 'chart_label']
         else:
-            # 기존 방식: 카테고리별 그룹핑
             path_list = ['category', 'chart_label']
 
         fig = px.treemap(
@@ -129,7 +139,7 @@ def render_payout_page(conn, follower_df, selected_category="전체보기", merg
         with col_head:
             st.subheader("📋 주급 랭킹 (Payout Ranking)")
         with col_toggle:
-            expand_view = st.toggle("전체 펼치기", value=False, key="payout_toggle")
+            expand_view = st.toggle("전체 펼치기", value=False, key="payout_ranking_toggle")
 
         ranking_df = display_df.sort_values(by='payout_amount', ascending=False).reset_index(drop=True)
         
