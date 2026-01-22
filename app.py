@@ -107,17 +107,8 @@ st.markdown("""
         cursor: pointer; 
         display: block !important; 
     }
-    
-    /* Chrome, Safari 등 웹킷 계열 */
-    details > summary::-webkit-details-marker { 
-        display: none !important; 
-    }
-    
-    /* Firefox 등 */
-    details > summary::marker {
-        display: none !important;
-        content: ""; 
-    }
+    details > summary::-webkit-details-marker { display: none !important; }
+    details > summary::marker { display: none !important; content: ""; }
 
     /* 리더보드 행 디자인 */
     .ranking-row { 
@@ -238,7 +229,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 카테고리 필터 (트위터 맵일 때만 표시해야 하므로 나중에 처리)
+    # 카테고리 필터 (공통 공간)
     category_placeholder = st.empty()
     
     for _ in range(3): st.write("")
@@ -269,24 +260,36 @@ with st.sidebar:
         </a>
     """, unsafe_allow_html=True)
 
-# [핵심 로직] 메뉴 구성 (주급 맵 추가 & 관리자 여부에 따라 리스트 변경)
+# [핵심 로직] 메뉴 구성
 menu_options = ["트위터 팔로워 맵", "트위터 주급 맵", "실시간 트위터", "지수 비교 (Indices)", "텔레그램 이벤트"]
 if is_admin:
     menu_options.append("관리자 페이지") 
 
-# [메뉴 렌더링] 위에서 만들어둔 placeholder에 메뉴를 그립니다.
+# [메뉴 렌더링]
 with menu_placeholder.container():
     st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
     menu = st.radio(" ", menu_options, label_visibility="collapsed")
 
-# [카테고리 필터 렌더링] 메뉴가 '트위터 팔로워 맵'일 때만 표시
+# [카테고리 필터 렌더링] 메뉴에 따라 필터 내용 변경
+selected_category = "전체보기" # 기본값
+
 if menu == "트위터 팔로워 맵":
     df = get_sheet_data()
     with category_placeholder.container():
         st.markdown('<div class="sidebar-header">카테고리 (CATEGORY)</div>', unsafe_allow_html=True)
         available_cats = ["전체보기"]
         if not df.empty: available_cats.extend(sorted(df['category'].unique().tolist()))
-        selected_category = st.radio("카테고리 선택", available_cats, label_visibility="collapsed")
+        selected_category = st.radio("카테고리 선택", available_cats, label_visibility="collapsed", key="follower_cat")
+
+elif menu == "트위터 주급 맵":
+    # 주급 데이터 불러와서 카테고리 추출
+    p_df = payout_logic.get_payout_data(conn)
+    with category_placeholder.container():
+        st.markdown('<div class="sidebar-header">카테고리 (CATEGORY)</div>', unsafe_allow_html=True)
+        p_cats = ["전체보기"]
+        if not p_df.empty:
+            p_cats.extend(sorted(p_df['category'].unique().tolist()))
+        selected_category = st.radio("카테고리 선택", p_cats, label_visibility="collapsed", key="payout_cat")
 
 
 # ==========================================
@@ -430,7 +433,7 @@ elif menu == "트위터 주급 맵":
     # 팔로워 데이터가 로드되어 있는지 확인하고 전달
     if 'df' not in locals() or df.empty:
         df = get_sheet_data()
-    payout_logic.render_payout_page(conn, df)
+    payout_logic.render_payout_page(conn, df, selected_category)
 
 # ==========================================
 # [PAGE 3] 실시간 트위터
