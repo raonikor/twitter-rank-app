@@ -11,7 +11,7 @@ import market_logic
 import visitor_logic
 import event_logic 
 import twitter_logic
-import payout_logic  # [NEW] 주급 맵 로직 추가
+import payout_logic 
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
@@ -23,26 +23,40 @@ st.markdown("""
     .stApp { background-color: #0F1115; color: #FFFFFF; }
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
-    /* 사이드바 메뉴 스타일 */
+    /* 사이드바 메뉴 스타일 (알약 모양) */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] { gap: 2px; }
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label > div:first-child { display: none !important; }
+    
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
         display: flex; width: 100%; padding: 6px 12px !important;
         border-radius: 8px !important; border: none !important;
         background-color: transparent; transition: all 0.2s ease; margin-bottom: 1px;
     }
+
+    /* 기본 상태 텍스트 색상 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label div,
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label p {
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label p,
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label span {
         color: #B0B3B8 !important; font-size: 14px; font-weight: 500;
     }
+
+    /* 호버 상태 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover { background-color: #282A2C !important; }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover p { color: #FFFFFF !important; }
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover p,
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover span,
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover div { 
+        color: #FFFFFF !important; 
+    }
     
     /* [선택된 메뉴] 스타일 (흰색 글씨 강제 적용) */
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) { background-color: #004A77 !important; }
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) * { color: #FFFFFF !important; font-weight: 700; }
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) { 
+        background-color: #004A77 !important; 
+    }
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) * { 
+        color: #FFFFFF !important; font-weight: 700; 
+    }
 
-    /* 소제목 & 방문자 박스 */
+    /* 사이드바 소제목 & 방문자 위젯 */
     .sidebar-header { font-size: 11px; font-weight: 700; color: #E0E0E0; margin-top: 15px; margin-bottom: 5px; padding-left: 8px; text-transform: uppercase; opacity: 0.9; }
     .visitor-box { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 12px; padding: 15px; margin-top: 20px; text-align: center; }
     .vis-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1px; }
@@ -81,18 +95,38 @@ st.markdown("""
     .event-prize { font-size: 15px; color: #10B981; font-weight: 600; margin-bottom: 12px; }
     .event-bottom { display: flex; justify-content: space-between; font-size: 13px; color: #9CA3AF; border-top: 1px solid #2D3035; padding-top: 10px; }
     
-    /* 메인 컨텐츠 요소 */
+    /* 상단 요약 카드 */
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* 리더보드 리스트 스타일 */
+    /* [수정] 리더보드 (아코디언) 스타일 - 화살표 완벽 제거 */
+    details > summary { 
+        list-style: none !important; 
+        outline: none !important; 
+        cursor: pointer; 
+        display: block !important; 
+    }
+    
+    /* Chrome, Safari 등 웹킷 계열 */
+    details > summary::-webkit-details-marker { 
+        display: none !important; 
+    }
+    
+    /* Firefox 등 */
+    details > summary::marker {
+        display: none !important;
+        content: ""; 
+    }
+
+    /* 리더보드 행 디자인 */
     .ranking-row { 
         display: flex; align-items: center; 
         background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
         padding: 10px 15px; margin-bottom: 6px; 
         transition: all 0.2s ease; 
         gap: 15px;
+        position: relative;
     }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
@@ -116,20 +150,20 @@ st.markdown("""
         overflow: hidden;
     }
     
-    /* 1. 최근 관심 (채도 낮춘 라임색) */
+    /* 1. 최근 관심 */
     .rank-interest { 
         font-size: 13px; 
-        color: #D4E157 !important; /* 눈이 편안한 라임색 */
+        color: #D4E157 !important; 
         font-weight: 700; 
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
         margin-bottom: 0;
     }
     
-    /* 2. 비고 (Raoni 딥 네이비) */
+    /* 2. 비고 */
     .rank-note { 
         font-size: 11px; 
-        color: #FFFFFF; /* 흰색 글씨 */
-        background-color: #004A77; /* Raoni 딥 네이비 */
+        color: #FFFFFF; 
+        background-color: #004A77; 
         padding: 2px 8px; 
         border-radius: 12px; 
         font-weight: 600;
@@ -143,6 +177,25 @@ st.markdown("""
     .rank-followers { font-size: 13px; font-weight: 600; color: #E5E7EB; width: 70px; text-align: right; }
     
     @media (max-width: 800px) { .rank-category { display: none; } .rank-info { width: 100px; } .rank-stats-group { width: 120px; } .rank-extra { display: none; } }
+    
+    /* Bio (소개글) 박스 스타일 */
+    .bio-box {
+        background-color: #15171B;
+        border: 1px solid #2D3035; border-top: none; 
+        border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+        padding: 15px 20px; margin-bottom: 8px; margin-top: -2px; 
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .bio-header { font-size: 11px; color: #60A5FA; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; letter-spacing: 0.5px;}
+    .bio-content { font-size: 14px; color: #D1D5DB; line-height: 1.6; font-weight: 400; }
+    .bio-link-btn {
+        display: inline-block; margin-top: 12px; font-size: 12px; 
+        color: #10B981; text-decoration: none; border: 1px solid #2D3035; 
+        padding: 4px 10px; border-radius: 4px; transition: all 0.2s; background-color: #1F2937;
+    }
+    .bio-link-btn:hover { background-color: #10B981; color: #FFFFFF; border-color: #10B981; }
     
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
@@ -217,7 +270,6 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # [핵심 로직] 메뉴 구성 (주급 맵 추가 & 관리자 여부에 따라 리스트 변경)
-# [NEW] '트위터 주급 맵'이 리스트에 포함됨
 menu_options = ["트위터 팔로워 맵", "트위터 주급 맵", "실시간 트위터", "지수 비교 (Indices)", "텔레그램 이벤트"]
 if is_admin:
     menu_options.append("관리자 페이지") 
@@ -329,42 +381,53 @@ if menu == "트위터 팔로워 맵":
                 interest_html = f"<div class='rank-interest'>{recent_safe}</div>" if recent_safe else ""
                 note_html = f"<span class='rank-note'>{note_safe}</span>" if note_safe else ""
                 
+                # bio 내용
+                if 'bio' not in row: bio_content = "소개글이 없습니다."
+                else: bio_content = clean_str(row['bio'])
+                if not bio_content: bio_content = "소개글이 없습니다."
+
                 list_html += f"""
-                <div class="ranking-row">
-                    <div class="rank-col-1">
-                        <div class="rank-num">{medal}</div>
-                        <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
+                <details {'open' if expand_view else ''}>
+                    <summary>
+                        <div class="ranking-row">
+                            <div class="rank-col-1">
+                                <div class="rank-num">{medal}</div>
+                                <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
+                            </div>
+                            <div class="rank-info">
+                                <div class="rank-name">{row['name']}</div>
+                                <div class="rank-handle">@{row['handle']}</div>
+                            </div>
+                            <div class="rank-extra">
+                                {interest_html}
+                                {note_html}
+                            </div>
+                            <div class="rank-stats-group">
+                                <div class="rank-category">{row['category']}</div>
+                                <div class="rank-share">{share_pct:.1f}%</div>
+                                <div class="rank-followers">{int(row['followers']):,}</div>
+                            </div>
+                        </div>
+                    </summary>
+                    <div class="bio-box">
+                        <div class="bio-header">📝 PROFILE BIO</div>
+                        <div class="bio-content">{bio_content}</div>
+                        <a href="https://twitter.com/{row['handle']}" target="_blank" class="bio-link-btn">
+                            Visit Profile ↗
+                        </a>
                     </div>
-                    <div class="rank-info">
-                        <div class="rank-name">{row['name']}</div>
-                        <div class="rank-handle">@{row['handle']}</div>
-                    </div>
-                    <div class="rank-extra">
-                        {interest_html}
-                        {note_html}
-                    </div>
-                    <div class="rank-stats-group">
-                        <div class="rank-category">{row['category']}</div>
-                        <div class="rank-share">{share_pct:.1f}%</div>
-                        <div class="rank-followers">{int(row['followers']):,}</div>
-                    </div>
-                </div>
+                </details>
                 """
             
-            # 조건부 컨테이너 생성
-            if expand_view:
-                with st.container():
-                    st.markdown(list_html, unsafe_allow_html=True)
-            else:
-                with st.container(height=600):
-                    st.markdown(list_html, unsafe_allow_html=True)
+            with st.container(height=600 if not expand_view else None):
+                st.markdown(list_html, unsafe_allow_html=True)
     else: st.info("데이터가 없습니다.")
 
 # ==========================================
 # [PAGE 2] 트위터 주급 맵 (NEW)
 # ==========================================
 elif menu == "트위터 주급 맵":
-    # [수정] 팔로워 데이터(df)가 로드되었는지 확인하고 전달
+    # 팔로워 데이터가 로드되어 있는지 확인하고 전달
     if 'df' not in locals() or df.empty:
         df = get_sheet_data()
     payout_logic.render_payout_page(conn, df)
@@ -402,4 +465,3 @@ elif menu == "관리자 페이지" and is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 구글 시트 데이터를 즉시 새로고침합니다.")
-
