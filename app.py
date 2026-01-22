@@ -14,7 +14,7 @@ import twitter_logic
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
 
-# 2. CSS 스타일 (깨짐 방지용 강력한 Flexbox 적용)
+# 2. CSS 스타일
 st.markdown("""
     <style>
     /* 전체 테마 */
@@ -82,67 +82,38 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* [수정됨] 리더보드 레이아웃 고정 (Flexbox) */
+    /* 리더보드 리스트 스타일 */
     .ranking-row { 
-        display: flex; 
-        align-items: center; 
-        background-color: #16191E; 
-        border: 1px solid #2D3035; 
-        border-radius: 6px; 
-        padding: 10px 15px; 
-        margin-bottom: 6px; 
-        transition: all 0.2s ease; 
-        gap: 15px; /* 아이템 간 간격 */
+        display: flex; align-items: center; 
+        background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
+        padding: 10px 15px; margin-bottom: 6px; 
+        transition: all 0.2s ease; gap: 15px;
     }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
-    /* 1. 등수 & 이미지 (고정폭 80px) */
     .rank-col-1 { display: flex; align-items: center; width: 80px; flex-shrink: 0; }
     .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 30px; text-align: center; margin-right: 5px; }
     .rank-img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #2D3035; object-fit: cover; background-color: #333; }
     
-    /* 2. 이름 & 핸들 (고정폭 150px) */
     .rank-info { width: 150px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
     .rank-name { font-size: 15px; font-weight: 700; color: #FFFFFF !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
     .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;}
     
-    /* 3. 최근관심 & 비고 (남은 공간 모두 차지) */
-    .rank-extra { 
-        flex-grow: 1; 
-        min-width: 0; /* Flexbox 내 말줄임표 작동 필수 속성 */
-        display: flex; 
-        flex-direction: column; 
-        justify-content: center;
-        overflow: hidden;
-    }
-    .rank-interest { 
-        font-size: 13px; color: #E0E7FF; font-weight: 500;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-        margin-bottom: 2px;
-    }
-    .rank-note { 
-        font-size: 11px; color: #6B7280; 
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
+    .rank-extra { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+    .rank-interest { font-size: 13px; color: #E0E7FF; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+    .rank-note { font-size: 11px; color: #6B7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* 4. 통계 정보 (고정폭 180px, 우측 정렬) */
-    .rank-stats-group { 
-        display: flex; align-items: center; justify-content: flex-end; width: 180px; flex-shrink: 0; 
-    }
+    .rank-stats-group { display: flex; align-items: center; justify-content: flex-end; width: 180px; flex-shrink: 0; }
     .rank-category { font-size: 10px; color: #9CA3AF; background-color: #374151; padding: 3px 8px; border-radius: 8px; margin-right: 10px; white-space: nowrap;}
     .rank-share { font-size: 13px; font-weight: 700; color: #10B981; width: 50px; text-align: right; margin-right: 5px; }
     .rank-followers { font-size: 13px; font-weight: 600; color: #E5E7EB; width: 70px; text-align: right; }
     
-    /* 모바일 대응 (좁은 화면에서는 일부 숨김) */
-    @media (max-width: 800px) { 
-        .rank-category { display: none; } 
-        .rank-info { width: 100px; }
-        .rank-stats-group { width: 120px; }
-        .rank-extra { display: none; } /* 모바일엔 공간 부족으로 숨김 */
-    }
+    @media (max-width: 800px) { .rank-category { display: none; } .rank-info { width: 100px; } .rank-stats-group { width: 120px; } .rank-extra { display: none; } }
     
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
+    .js-plotly-plot .plotly .main-svg g.shapelayer path { transition: filter 0.2s ease; cursor: pointer; }
+    .js-plotly-plot .plotly .main-svg g.shapelayer path:hover { filter: brightness(1.2) !important; opacity: 1 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -157,24 +128,25 @@ def get_sheet_data():
     try:
         df = conn.read(ttl="0") 
         if df is not None and not df.empty:
-            # 1. 숫자 변환 (팔로워)
+            # 1. 숫자 변환 (팔로워) - 에러나면 0으로
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
             
-            # 2. 필수 컬럼 및 문자열 강제 변환 (TypeError 방지)
-            cols_to_check = ['category', 'handle', 'name', 'recent_interest', 'note']
-            for col in cols_to_check:
+            # 2. [핵심] 모든 문자열 컬럼 강제 변환 (NaN 방지)
+            str_cols = ['handle', 'name', 'category', 'recent_interest', 'note']
+            for col in str_cols:
                 if col not in df.columns:
-                    df[col] = '' # 없으면 빈칸으로 생성
-                # 핵심: 무조건 문자열로 변환 (NaN -> "" -> "nan" 방지)
-                df[col] = df[col].fillna('').astype(str)
+                    df[col] = "" # 컬럼이 없으면 빈 값으로 생성
+                
+                # [중요] 모든 값을 무조건 문자열로 변환 (float, NaN 모두 제거)
+                df[col] = df[col].fillna("").astype(str)
             
-            # 이름 비어있으면 핸들로 대체
-            mask = df['name'] == ''
+            # 이름이 비어있으면 핸들로 채우기
+            mask = (df['name'] == "") | (df['name'] == "nan")
             df.loc[mask, 'name'] = df.loc[mask, 'handle']
             
         return df
-    except Exception:
-        # 에러나면 빈 데이터프레임 리턴 (화면 터짐 방지)
+    except Exception as e:
+        # 에러 발생 시에도 빈 DataFrame 반환하여 앱 멈춤 방지
         return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'recent_interest', 'note'])
 
 # 4. 사이드바 구성
@@ -244,8 +216,11 @@ if menu == "트위터 팔로워 맵":
         st.write("")
 
         if not display_df.empty:
-            # [에러 방지] 문자열 결합 전 강제 형변환 (한번 더 안전장치)
-            display_df['chart_label'] = display_df['name'].astype(str) + "<br><span style='font-size:0.7em; font-weight:normal;'>@" + display_df['handle'].astype(str) + "</span>"
+            # [에러 방지] 람다 함수를 사용하여 안전하게 문자열 결합 (벡터 연산 에러 회피)
+            display_df['chart_label'] = display_df.apply(
+                lambda x: f"{str(x['name'])}<br><span style='font-size:0.7em; font-weight:normal;'>@{str(x['handle'])}</span>", 
+                axis=1
+            )
             display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
 
             fig = px.treemap(
@@ -290,6 +265,10 @@ if menu == "트위터 팔로워 맵":
                 # 데이터 안전하게 가져오기 (문자열 변환)
                 recent = str(row['recent_interest']).strip()
                 note = str(row['note']).strip()
+                
+                # "nan" 문자열이 들어오는 경우 처리
+                if recent == "nan": recent = ""
+                if note == "nan": note = ""
                 
                 interest_html = f"👀 {recent}" if recent else ""
                 note_html = f"📝 {note}" if note else ""
