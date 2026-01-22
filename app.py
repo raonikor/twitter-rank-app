@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 import market_logic 
 import visitor_logic
 import event_logic 
-import twitter_logic
+import twitter_logic 
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
@@ -81,53 +81,48 @@ st.markdown("""
     .metric-card { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 8px; padding: 20px; text-align: left; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
-    .metric-delta { font-size: 14px; font-weight: 500; margin-top: 5px; }
-    .delta-up { color: #10B981; } .delta-down { color: #EF4444; }
     
-    /* [리더보드 & 아코디언 스타일] */
-    details > summary { list-style: none; outline: none; cursor: pointer; }
-    details > summary::-webkit-details-marker { display: none; }
+    /* [수정됨] 리더보드 리스트 스타일 */
+    .ranking-row { display: flex; align-items: center; justify-content: space-between; background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 10px 15px; margin-bottom: 6px; transition: all 0.2s ease; }
+    .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
-    .ranking-row { 
-        display: flex; align-items: center; justify-content: space-between; 
-        background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
-        padding: 8px 12px; margin-bottom: 0px; 
-        transition: all 0.2s ease; 
+    .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 30px; text-align: center; }
+    .rank-img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 12px; object-fit: cover; }
+    
+    /* 이름/핸들 영역 (고정폭 확보) */
+    .rank-info { width: 140px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; margin-right: 10px; }
+    .rank-name { font-size: 15px; font-weight: 700; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; }
+    
+    /* [NEW] 최근관심 & 비고 영역 (유동적 공간) */
+    .rank-extra { 
+        flex-grow: 1; /* 남은 공간 차지 */
+        display: flex; 
+        flex-direction: column; 
+        justify-content: center;
+        margin-right: 15px;
+        min-width: 0; /* flex box 내 text-overflow 작동 필수 */
     }
-    .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; }
-    
-    /* 요약 정보(Bio) 박스 스타일 */
-    .bio-box {
-        background-color: #15171B;
-        border: 1px solid #2D3035;
-        border-top: none; 
-        border-bottom-left-radius: 6px;
-        border-bottom-right-radius: 6px;
-        padding: 15px 20px;
-        margin-bottom: 8px;
-        margin-top: -2px; 
-        animation: fadeIn 0.3s ease-in-out;
+    .rank-interest { 
+        font-size: 13px; color: #E0E7FF; 
+        font-weight: 500;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+        margin-bottom: 2px;
     }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-    
-    .bio-header { font-size: 11px; color: #60A5FA; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; letter-spacing: 0.5px;}
-    .bio-content { font-size: 14px; color: #D1D5DB; line-height: 1.6; font-weight: 400; }
-    .bio-link-btn {
-        display: inline-block; margin-top: 12px; font-size: 12px; 
-        color: #10B981; text-decoration: none; border: 1px solid #2D3035; 
-        padding: 4px 10px; border-radius: 4px; transition: all 0.2s; background-color: #1F2937;
+    .rank-note { 
+        font-size: 11px; color: #6B7280; 
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .bio-link-btn:hover { background-color: #10B981; color: #FFFFFF; border-color: #10B981; }
 
-    .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 25px; }
-    .rank-img { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 10px; object-fit: cover; }
-    .rank-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
-    .rank-name { font-size: 14px; font-weight: 700; color: #FFFFFF; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
-    .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; line-height: 1.2; }
-    .rank-share { font-size: 13px; font-weight: 700; color: #10B981; min-width: 50px; text-align: right; margin-right: 10px; }
-    .rank-followers { font-size: 13px; font-weight: 600; color: #E5E7EB; text-align: right; min-width: 70px; }
-    .rank-category { font-size: 10px; color: #9CA3AF; background-color: #374151; padding: 2px 6px; border-radius: 8px; margin-right: 8px; display: none; }
-    @media (min-width: 640px) { .rank-category { display: block; } .rank-name { max-width: 300px; } }
+    /* 수치 영역 */
+    .rank-stats-group { display: flex; align-items: center; }
+    .rank-category { font-size: 10px; color: #9CA3AF; background-color: #374151; padding: 3px 8px; border-radius: 8px; margin-right: 10px; display: none; }
+    .rank-share { font-size: 13px; font-weight: 700; color: #10B981; width: 50px; text-align: right; margin-right: 10px; }
+    .rank-followers { font-size: 13px; font-weight: 600; color: #E5E7EB; width: 70px; text-align: right; }
+    
+    @media (min-width: 800px) { 
+        .rank-category { display: block; } 
+    }
     
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
     .js-plotly-plot .plotly .main-svg { background-color: rgba(0,0,0,0) !important; }
@@ -153,12 +148,15 @@ def get_sheet_data():
             if 'name' not in df.columns: df['name'] = df['handle'] 
             else: df['name'] = df['name'].fillna(df['handle'])
             
-            # [수정] bio 컬럼 가져오기 (없으면 '정보 없음' 처리)
-            if 'bio' not in df.columns: df['bio'] = "소개글이 없습니다."
-            else: df['bio'] = df['bio'].fillna("소개글이 없습니다.")
+            # [NEW] 최근관심 및 비고 데이터 처리 (없으면 빈칸)
+            if 'recent_interest' not in df.columns: df['recent_interest'] = ''
+            else: df['recent_interest'] = df['recent_interest'].fillna('')
+            
+            if 'note' not in df.columns: df['note'] = ''
+            else: df['note'] = df['note'].fillna('')
             
         return df
-    except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'bio'])
+    except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'recent_interest', 'note'])
 
 # 4. 사이드바 구성
 with st.sidebar:
@@ -259,7 +257,6 @@ if menu == "트위터 팔로워 맵":
 
             st.write("")
             st.subheader("🏆 팔로워 순위 (Leaderboard)")
-            st.caption("카드를 클릭하면 상세 정보를 볼 수 있습니다.")
             
             ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
             view_total = ranking_df['followers'].sum()
@@ -271,33 +268,37 @@ if menu == "트위터 팔로워 맵":
                 img_url = f"https://unavatar.io/twitter/{row['handle']}"
                 share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
                 
-                # [수정] Bio 정보 가져오기
-                bio_content = row['bio'] if row['bio'] else "소개글이 없습니다."
+                # [NEW] 최근 관심사 및 비고 가져오기
+                recent = row['recent_interest'] if row['recent_interest'] else ""
+                note = row['note'] if row['note'] else ""
                 
-                # [수정] 박스 타이틀을 PROFILE BIO로 변경
+                # 비어있지 않을 때만 아이콘 표시
+                interest_html = f"👀 {recent}" if recent else ""
+                note_html = f"📝 {note}" if note else ""
+
                 list_html += f"""
-                <details>
-                    <summary>
-                        <div class="ranking-row">
-                            <div class="rank-num">{medal}</div>
-                            <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
-                            <div class="rank-info">
-                                <div class="rank-name">{row['name']}</div>
-                                <div class="rank-handle">@{row['handle']}</div>
-                            </div>
-                            <div class="rank-category">{row['category']}</div>
-                            <div class="rank-share">{share_pct:.1f}%</div>
-                            <div class="rank-followers">{int(row['followers']):,}</div>
-                        </div>
-                    </summary>
-                    <div class="bio-box">
-                        <div class="bio-header">📝 PROFILE BIO</div>
-                        <div class="bio-content">{bio_content}</div>
-                        <a href="https://twitter.com/{row['handle']}" target="_blank" class="bio-link-btn">
-                            Visit Profile ↗
-                        </a>
+                <div class="ranking-row">
+                    <div style="display:flex; align-items:center;">
+                        <div class="rank-num">{medal}</div>
+                        <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
                     </div>
-                </details>
+
+                    <div class="rank-info">
+                        <div class="rank-name">{row['name']}</div>
+                        <div class="rank-handle">@{row['handle']}</div>
+                    </div>
+
+                    <div class="rank-extra">
+                        <div class="rank-interest">{interest_html}</div>
+                        <div class="rank-note">{note_html}</div>
+                    </div>
+
+                    <div class="rank-stats-group">
+                        <div class="rank-category">{row['category']}</div>
+                        <div class="rank-share">{share_pct:.1f}%</div>
+                        <div class="rank-followers">{int(row['followers']):,}</div>
+                    </div>
+                </div>
                 """
             with st.container(height=500): st.markdown(list_html, unsafe_allow_html=True)
     else: st.info("데이터가 없습니다.")
@@ -309,7 +310,7 @@ elif menu == "실시간 트위터":
     twitter_logic.render_twitter_page()
 
 # ==========================================
-# [PAGE 3] 지수 비교 (Indices)
+# [PAGE 3] 지수 비교
 # ==========================================
 elif menu == "지수 비교 (Indices)":
     market_logic.render_market_page()
