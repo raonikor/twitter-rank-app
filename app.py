@@ -1,13 +1,3 @@
-네, **최근 관심사는 "흰색에 가까운 라임색(#F4FF81)"**, **비고 버튼은 "파란색(#2979FF)"**으로 변경하여 디자인을 수정했습니다. 어두운 배경에서 글씨가 잘 보이도록 색상 대비를 조정했습니다.
-
-### 🎨 색상 변경 사항
-
-* **최근 관심 (Recent Interest):** `#F4FF81` (아주 밝은 라임색)
-* **비고 (Note Badge):** `#2979FF` (선명한 파란색) + **흰색 글씨** (가독성 확보)
-
-아래 코드를 **`app.py`** 전체에 덮어쓰기 하세요.
-
-```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -363,5 +353,3 @@ if is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 데이터를 새로고침합니다.")
-
-```
