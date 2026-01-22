@@ -364,7 +364,10 @@ if menu == "트위터 팔로워 맵":
 # [PAGE 2] 트위터 주급 맵 (NEW)
 # ==========================================
 elif menu == "트위터 주급 맵":
-    payout_logic.render_payout_page(conn)
+    # [수정] 팔로워 데이터(df)가 로드되었는지 확인하고 전달
+    if 'df' not in locals() or df.empty:
+        df = get_sheet_data()
+    payout_logic.render_payout_page(conn, df)
 
 # ==========================================
 # [PAGE 3] 실시간 트위터
@@ -399,3 +402,4 @@ elif menu == "관리자 페이지" and is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 구글 시트 데이터를 즉시 새로고침합니다.")
+
