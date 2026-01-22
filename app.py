@@ -1,3 +1,12 @@
+네, 메인 화면 **최상단에 흐르는 뉴스 티커(News Ticker)** 기능을 추가해 드리겠습니다.
+
+CSS 애니메이션을 활용하여 부드럽게 흘러가는 현대적인 디자인으로 구현했습니다. `app.py` 파일의 **`st.markdown` (CSS 스타일)** 부분과 **메인 로직 시작 부분**에 코드를 추가하면 됩니다.
+
+**`app.py`** 전체 코드를 아래 내용으로 덮어씌워 주세요.
+
+### 📰 뉴스 티커가 추가된 `app.py`
+
+```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -17,7 +26,7 @@ import follower_logic
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
 
-# 2. CSS 스타일
+# 2. CSS 스타일 (뉴스 티커 스타일 추가됨)
 st.markdown("""
     <style>
     /* 전체 테마 */
@@ -25,64 +34,77 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
     /* ------------------------------------------------------- */
-    /* [수정] 사이드바 메뉴 스타일 (세로형 알약 버튼) */
+    /* [NEW] 뉴스 티커 (News Ticker) 스타일 */
     /* ------------------------------------------------------- */
-    
-    /* 라디오 버튼 그룹 컨테이너: 세로 정렬 강제 */
-    [data-testid="stSidebar"] .stRadio [role="radiogroup"] { 
-        display: flex;
-        flex-direction: column !important; /* 세로 정렬 */
-        gap: 6px; /* 버튼 사이 간격 */
+    .ticker-container {
+        width: 100%;
+        background-color: #16191E; /* 배경색 */
+        border-bottom: 1px solid #2D3035;
+        overflow: hidden;
+        white-space: nowrap;
+        padding: 10px 0;
+        margin-bottom: 20px;
+        position: relative;
     }
     
-    /* 기본 라디오 버튼(동그라미) 숨기기 */
+    .ticker-wrapper {
+        display: inline-block;
+        padding-left: 100%;
+        animation: ticker 30s linear infinite; /* 속도 조절 (초) */
+    }
+    
+    .ticker-item {
+        display: inline-block;
+        font-size: 14px;
+        color: #E0E0E0;
+        font-weight: 500;
+        padding-right: 50px; /* 항목 간 간격 */
+    }
+    
+    .ticker-highlight {
+        color: #10B981; /* 강조 색상 (녹색) */
+        font-weight: 700;
+        margin-right: 5px;
+    }
+
+    @keyframes ticker {
+        0% { transform: translate3d(0, 0, 0); }
+        100% { transform: translate3d(-100%, 0, 0); }
+    }
+
+    /* ------------------------------------------------------- */
+    /* 사이드바 메뉴 스타일 (세로형 알약 버튼) */
+    /* ------------------------------------------------------- */
+    [data-testid="stSidebar"] .stRadio [role="radiogroup"] { 
+        display: flex; flex-direction: column !important; gap: 6px; 
+    }
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label > div:first-child { 
         display: none !important; 
     }
-    
-    /* 버튼(Label) 스타일 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label {
-        display: flex; 
-        width: 100%; /* 너비 꽉 채우기 */
-        padding: 10px 16px !important;
-        border-radius: 12px !important; 
-        border: 1px solid transparent !important;
-        background-color: transparent; 
-        transition: all 0.2s ease; 
-        margin-bottom: 0px;
-        align-items: center;
+        display: flex; width: 100%; padding: 10px 16px !important;
+        border-radius: 12px !important; border: 1px solid transparent !important;
+        background-color: transparent; transition: all 0.2s ease; margin-bottom: 0px; align-items: center;
     }
-
-    /* 텍스트 스타일 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label div,
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label p,
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label span {
-        color: #9CA3AF !important; /* 기본 회색 */
-        font-size: 14px; 
-        font-weight: 500;
+        color: #9CA3AF !important; font-size: 14px; font-weight: 500;
     }
-
-    /* [호버 상태] 마우스 올렸을 때 */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover { 
         background-color: #282A2C !important; 
     }
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:hover p { 
         color: #FFFFFF !important; 
     }
-    
-    /* [선택된 상태] 스타일 (파란색 배경 + 흰색 글씨) */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) { 
-        background-color: #004A77 !important; 
-        border: 1px solid #00568C !important;
+        background-color: #004A77 !important; border: 1px solid #00568C !important;
     }
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] > label:has(input:checked) p { 
-        color: #FFFFFF !important; 
-        font-weight: 700; 
+        color: #FFFFFF !important; font-weight: 700; 
     }
 
-    /* ------------------------------------------------------- */
-    /* 기타 UI 스타일 (기존 유지) */
-    /* ------------------------------------------------------- */
+    /* 기타 UI 스타일 */
     .sidebar-header { font-size: 11px; font-weight: 700; color: #E0E0E0; margin-top: 15px; margin-bottom: 5px; padding-left: 8px; text-transform: uppercase; opacity: 0.9; }
     .visitor-box { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 12px; padding: 15px; margin-top: 20px; text-align: center; }
     .vis-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1px; }
@@ -185,6 +207,28 @@ with menu_placeholder.container():
     st.markdown('<div class="sidebar-header">메뉴 (MENU)</div>', unsafe_allow_html=True)
     menu = st.radio(" ", menu_options, label_visibility="collapsed")
 
+# ---------------------------------------------------------
+# [NEW] 뉴스 티커 렌더링 (메인 화면 상단)
+# ---------------------------------------------------------
+# 원하는 공지사항을 리스트에 추가하세요.
+ticker_messages = [
+    "📢 <span class='ticker-highlight'>NOTICE</span> 트위터 팔로워 데이터는 매일 자정에 업데이트 됩니다.",
+    "💰 <span class='ticker-highlight'>UPDATE</span> 이번 주 트위터 주급 정산 내역이 갱신되었습니다.",
+    "🏆 <span class='ticker-highlight'>EVENT</span> 텔레그램 채널에서 진행 중인 이벤트를 확인하세요!",
+    "🚀 Raoni Map에 오신 것을 환영합니다. 왼쪽 메뉴에서 원하시는 기능을 선택해주세요."
+]
+
+# 메시지를 HTML div로 변환
+ticker_items_html = "".join([f'<div class="ticker-item">{msg}</div>' for msg in ticker_messages])
+
+st.markdown(f"""
+    <div class="ticker-container">
+        <div class="ticker-wrapper">
+            {ticker_items_html}
+        </div>
+    </div>
+""", unsafe_allow_html=True)
+
 # ==========================================
 # [PAGE 1] 트위터 팔로워 맵
 # ==========================================
@@ -220,3 +264,5 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
+
+```
