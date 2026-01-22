@@ -14,7 +14,7 @@ import twitter_logic
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
 
-# 2. CSS 스타일
+# 2. CSS 스타일 (레이아웃 깨짐 방지 & 텍스트 색상 강제 지정)
 st.markdown("""
     <style>
     /* 전체 테마 */
@@ -47,7 +47,7 @@ st.markdown("""
     .vis-total { color: #E5E7EB; }
     .vis-divider { height: 1px; background-color: #2D3035; margin: 8px 0; }
 
-    /* 소셜 링크 박스 스타일 */
+    /* 소셜 링크 박스 */
     .social-box {
         display: flex; align-items: center; background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 12px; padding: 10px 15px; margin-top: 8px;
         text-decoration: none !important; transition: all 0.2s ease; cursor: pointer;
@@ -59,7 +59,7 @@ st.markdown("""
     .social-name { font-size: 13px; font-weight: 700; color: #FFFFFF; line-height: 1.2;}
     .social-handle { font-size: 11px; color: #6B7280; }
 
-    /* 이벤트 카드 스타일 */
+    /* 이벤트 카드 */
     .event-card-link { text-decoration: none !important; }
     .event-card {
         background-color: #1C1F26;
@@ -82,30 +82,41 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* [수정됨] 리더보드 리스트 스타일 */
-    .ranking-row { display: flex; align-items: center; justify-content: space-between; background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; padding: 10px 15px; margin-bottom: 6px; transition: all 0.2s ease; }
+    /* [수정됨] 리더보드 레이아웃 고정 */
+    .ranking-row { 
+        display: flex; 
+        align-items: center; 
+        background-color: #16191E; 
+        border: 1px solid #2D3035; 
+        border-radius: 6px; 
+        padding: 10px 15px; 
+        margin-bottom: 6px; 
+        transition: all 0.2s ease; 
+        /* 요소 간 간격 조절 */
+        gap: 15px;
+    }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; transform: translateX(5px); }
     
-    .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 30px; text-align: center; }
-    .rank-img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 12px; object-fit: cover; }
+    /* 1. 등수 & 이미지 (고정폭) */
+    .rank-col-1 { display: flex; align-items: center; width: 80px; flex-shrink: 0; }
+    .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 30px; text-align: center; margin-right: 5px; }
+    .rank-img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #2D3035; object-fit: cover; background-color: #333; }
     
-    /* 이름/핸들 영역 (고정폭 확보) */
-    .rank-info { width: 140px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; margin-right: 10px; }
-    .rank-name { font-size: 15px; font-weight: 700; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; }
+    /* 2. 이름 & 핸들 (고정폭) */
+    .rank-info { width: 150px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+    .rank-name { font-size: 15px; font-weight: 700; color: #FFFFFF !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
     
-    /* [NEW] 최근관심 & 비고 영역 (유동적 공간) */
+    /* 3. 최근관심 & 비고 (남은 공간 차지) */
     .rank-extra { 
-        flex-grow: 1; /* 남은 공간 차지 */
+        flex-grow: 1; 
+        min-width: 0; /* Flexbox 내에서 말줄임표 작동하게 함 */
         display: flex; 
         flex-direction: column; 
         justify-content: center;
-        margin-right: 15px;
-        min-width: 0; /* flex box 내 text-overflow 작동 필수 */
     }
     .rank-interest { 
-        font-size: 13px; color: #E0E7FF; 
-        font-weight: 500;
+        font-size: 13px; color: #E0E7FF; font-weight: 500;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
         margin-bottom: 2px;
     }
@@ -114,14 +125,18 @@ st.markdown("""
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* 수치 영역 */
-    .rank-stats-group { display: flex; align-items: center; }
-    .rank-category { font-size: 10px; color: #9CA3AF; background-color: #374151; padding: 3px 8px; border-radius: 8px; margin-right: 10px; display: none; }
-    .rank-share { font-size: 13px; font-weight: 700; color: #10B981; width: 50px; text-align: right; margin-right: 10px; }
+    /* 4. 통계 정보 (우측 정렬 고정폭) */
+    .rank-stats-group { 
+        display: flex; align-items: center; justify-content: flex-end; width: 180px; flex-shrink: 0; 
+    }
+    .rank-category { font-size: 10px; color: #9CA3AF; background-color: #374151; padding: 3px 8px; border-radius: 8px; margin-right: 10px; white-space: nowrap;}
+    .rank-share { font-size: 13px; font-weight: 700; color: #10B981; width: 50px; text-align: right; margin-right: 5px; }
     .rank-followers { font-size: 13px; font-weight: 600; color: #E5E7EB; width: 70px; text-align: right; }
     
-    @media (min-width: 800px) { 
-        .rank-category { display: block; } 
+    @media (max-width: 800px) { 
+        .rank-category { display: none; } 
+        .rank-info { width: 100px; }
+        .rank-stats-group { width: 120px; }
     }
     
     h1, h2, h3 { font-family: 'sans-serif'; color: #FFFFFF !important; }
@@ -142,21 +157,25 @@ def get_sheet_data():
     try:
         df = conn.read(ttl="0") 
         if df is not None and not df.empty:
+            # 1. 숫자 데이터 처리 (에러 방지)
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
-            df['category'] = df['category'].fillna('미분류') if 'category' in df.columns else '미분류'
-            df['handle'] = df['handle'].astype(str)
-            if 'name' not in df.columns: df['name'] = df['handle'] 
-            else: df['name'] = df['name'].fillna(df['handle'])
             
-            # [NEW] 최근관심 및 비고 데이터 처리 (없으면 빈칸)
-            if 'recent_interest' not in df.columns: df['recent_interest'] = ''
-            else: df['recent_interest'] = df['recent_interest'].fillna('')
+            # 2. 문자열 데이터 처리 (TypeError 방지 - 모든 텍스트 컬럼 강제 변환)
+            # 없는 컬럼은 만들고, 비어있으면 빈 문자열로 채움
+            cols_to_check = ['category', 'handle', 'name', 'recent_interest', 'note']
+            for col in cols_to_check:
+                if col not in df.columns:
+                    df[col] = ''
+                df[col] = df[col].fillna('').astype(str)
             
-            if 'note' not in df.columns: df['note'] = ''
-            else: df['note'] = df['note'].fillna('')
+            # 이름이 없으면 핸들로 채우기
+            mask = df['name'] == ''
+            df.loc[mask, 'name'] = df.loc[mask, 'handle']
             
         return df
-    except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'recent_interest', 'note'])
+    except Exception as e:
+        # 에러 발생 시 빈 데이터프레임 반환 (화면이 죽는 것 방지)
+        return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'recent_interest', 'note'])
 
 # 4. 사이드바 구성
 with st.sidebar:
@@ -226,8 +245,9 @@ if menu == "트위터 팔로워 맵":
         st.write("")
 
         if not display_df.empty:
+            # [에러 방지] 문자열 결합 전 강제 형변환 보장
+            display_df['chart_label'] = display_df['name'].astype(str) + "<br><span style='font-size:0.7em; font-weight:normal;'>@" + display_df['handle'].astype(str) + "</span>"
             display_df['log_followers'] = np.log10(display_df['followers'].replace(0, 1))
-            display_df['chart_label'] = display_df['name'] + "<br><span style='font-size:0.7em; font-weight:normal;'>@" + display_df['handle'] + "</span>"
 
             fig = px.treemap(
                 display_df, 
@@ -268,17 +288,16 @@ if menu == "트위터 팔로워 맵":
                 img_url = f"https://unavatar.io/twitter/{row['handle']}"
                 share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
                 
-                # [NEW] 최근 관심사 및 비고 가져오기
-                recent = row['recent_interest'] if row['recent_interest'] else ""
-                note = row['note'] if row['note'] else ""
+                # 데이터 안전하게 가져오기
+                recent = str(row['recent_interest']) if row['recent_interest'] else ""
+                note = str(row['note']) if row['note'] else ""
                 
-                # 비어있지 않을 때만 아이콘 표시
                 interest_html = f"👀 {recent}" if recent else ""
                 note_html = f"📝 {note}" if note else ""
 
                 list_html += f"""
                 <div class="ranking-row">
-                    <div style="display:flex; align-items:center;">
+                    <div class="rank-col-1">
                         <div class="rank-num">{medal}</div>
                         <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
                     </div>
