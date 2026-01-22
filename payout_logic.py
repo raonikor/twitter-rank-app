@@ -66,23 +66,22 @@ def render_payout_page(conn):
         st.write("")
 
         # ---------------------------------------------------------
-        # 1. 트리맵 차트 (스타일 팔로워 맵과 통일)
+        # 1. 트리맵 차트
         # ---------------------------------------------------------
         display_df['chart_label'] = display_df.apply(
             lambda x: f"{str(x['name'])}<br><span style='font-size:0.7em; font-weight:normal;'>@{str(x['handle'])}</span>", 
             axis=1
         )
         
-        # 돈이니까 초록색 테마 사용
+        # [수정됨] 팔로워 맵과 동일한 그라데이션 적용
         fig = px.treemap(
             display_df, 
             path=['category', 'chart_label'], 
             values='payout_amount', 
-            color='payout_amount',
+            color='payout_amount', # 값에 따라 색상 변경
             custom_data=['name', 'handle'],
-            color_continuous_scale=[
-                (0.0, '#1B2E1E'), (0.2, '#2E5936'), (0.5, '#34A853'), (1.0, '#A8D67F')
-            ],
+            # 팔로워 맵과 동일한 복잡한 그라데이션 스케일
+            color_continuous_scale=[(0.00, '#2E2B4E'), (0.05, '#353263'), (0.10, '#3F3C5C'), (0.15, '#464282'), (0.20, '#4A477A'), (0.25, '#4A5D91'), (0.30, '#4A6FA5'), (0.35, '#537CA8'), (0.40, '#5C8BAE'), (0.45, '#5C98AE'), (0.50, '#5E9CA8'), (0.55, '#5E9E94'), (0.60, '#5F9E7F'), (0.65, '#729E6F'), (0.70, '#859E5F'), (0.75, '#969E5F'), (0.80, '#A89E5F'), (0.85, '#AD905D'), (0.90, '#AE815C'), (0.95, '#AE6E5C'), (1.00, '#AE5C5C')],
             template="plotly_dark"
         )
         
@@ -106,7 +105,7 @@ def render_payout_page(conn):
         st.write("")
 
         # ---------------------------------------------------------
-        # 2. 리더보드 리스트 (팔로워 맵과 동일한 HTML 구조 적용)
+        # 2. 리더보드 리스트
         # ---------------------------------------------------------
         col_head, col_toggle = st.columns([1, 0.3])
         with col_head:
@@ -125,7 +124,6 @@ def render_payout_page(conn):
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
             share_pct = (row['payout_amount'] / view_total * 100) if view_total > 0 else 0
             
-            # 주급 맵에는 'bio'가 없을 수도 있으므로 처리
             bio_content = row['bio'] if row['bio'] else "수익 인증 상세 정보가 없습니다."
 
             list_html += f"""
@@ -141,7 +139,7 @@ def render_payout_page(conn):
                             <div class="rank-handle">@{row['handle']}</div>
                         </div>
                         <div class="rank-extra">
-                            </div>
+                        </div>
                         <div class="rank-stats-group">
                             <div class="rank-category">{row['category']}</div>
                             <div class="rank-share">{share_pct:.1f}%</div>
