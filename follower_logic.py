@@ -73,10 +73,18 @@ def render_follower_page(conn, df):
     # ---------------------------------------------------------
     # [UI] 카테고리 선택 & 통합 보기 토글
     # ---------------------------------------------------------
+    # 1. 카테고리 리스트 생성
     if 'category' in df.columns:
         all_cats = ["전체보기"] + sorted(df['category'].dropna().unique().tolist())
     else:
         all_cats = ["전체보기"]
+
+    # 2. 기본값(index) 설정: '크립토'가 있으면 그걸로, 없으면 0번(전체보기)
+    default_index = 0
+    target_category = "크립토"  # [수정] 기본으로 보여줄 카테고리 이름
+    
+    if target_category in all_cats:
+        default_index = all_cats.index(target_category)
 
     # 화면 분할 (왼쪽: 카테고리 버튼 / 오른쪽: 통합 토글)
     col_cat, col_opt = st.columns([0.8, 0.2])
@@ -86,6 +94,7 @@ def render_follower_page(conn, df):
         selected_category = st.radio(
             "카테고리 선택", 
             all_cats, 
+            index=default_index, # [수정] 여기서 기본값 설정
             horizontal=True, 
             label_visibility="collapsed",
             key="follower_category_main"
