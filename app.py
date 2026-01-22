@@ -113,7 +113,7 @@ st.markdown("""
         overflow: hidden;
     }
     
-    /* [수정됨] 1. 최근 관심 (흰색에 가까운 라임색) */
+    /* 1. 최근 관심 (흰색에 가까운 라임색) */
     .rank-interest { 
         font-size: 13px; 
         color: #F4FF81 !important; /* 아주 밝은 라임색 */
@@ -122,11 +122,11 @@ st.markdown("""
         margin-bottom: 0;
     }
     
-    /* [수정됨] 2. 비고 (파란색 버튼 + 흰색 글씨) */
+    /* [수정됨] 2. 비고 (어두운 파란색 버튼 + 흰색 글씨) */
     .rank-note { 
         font-size: 11px; 
         color: #FFFFFF; /* 흰색 글씨 */
-        background-color: #2979FF; /* 밝은 파란색 */
+        background-color: #1565C0; /* 어두운 파란색 */
         padding: 2px 8px; 
         border-radius: 12px; 
         font-weight: 600;
