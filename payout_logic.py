@@ -3,12 +3,14 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 
-# 1. 주급 데이터 가져오기
+# 1. 주급 데이터 가져오기 (캐싱 에러 방지를 위해 ttl 사용)
 def get_payout_data(conn): 
     try:
+        # 30분 캐시
         df = conn.read(worksheet="payouts", ttl="30m") 
         
         if df is not None and not df.empty:
+            # 숫자 변환 (콤마 제거)
             df['payout_amount'] = pd.to_numeric(
                 df['payout_amount'].astype(str).str.replace(',', ''), errors='coerce'
             ).fillna(0)
@@ -16,9 +18,11 @@ def get_payout_data(conn):
             df['category'] = df['category'].fillna('미분류')
             df['handle'] = df['handle'].astype(str).str.strip()
             
+            # 이름 없으면 핸들로 대체
             if 'name' not in df.columns: df['name'] = df['handle']
             else: df['name'] = df['name'].fillna(df['handle'])
             
+            # bio 컬럼 처리
             if 'bio' not in df.columns: df['bio'] = ""
             else: df['bio'] = df['bio'].fillna("")
             
@@ -26,7 +30,7 @@ def get_payout_data(conn):
     except Exception as e:
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category', 'bio'])
 
-# 2. 주급 맵 렌더링 (merge_categories 인자 제거 - 내부에서 처리)
+# 2. 주급 맵 렌더링 (카테고리 필터 기능 추가됨)
 def render_payout_page(conn, follower_df, selected_category="전체보기"):
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
     st.caption(f"이번 주 트위터 수익 정산 현황 - {selected_category}")
@@ -34,18 +38,20 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
     payout_df = get_payout_data(conn)
     
     if not payout_df.empty:
-        # 0원 제외
+        # 0원인 사람은 제외
         display_df = payout_df[payout_df['payout_amount'] > 0]
         
-        # 카테고리 필터링
+        # [NEW] 카테고리 필터링 적용
         if selected_category != "전체보기":
             display_df = display_df[display_df['category'] == selected_category]
         
         if display_df.empty:
-            st.info(f"'{selected_category}' 데이터가 없습니다.")
+            st.info(f"'{selected_category}' 카테고리에 해당하는 데이터가 없습니다.")
             return
 
-        # 팔로워 데이터 병합
+        # ---------------------------------------------------------
+        # 팔로워 데이터와 병합 (Merge)
+        # ---------------------------------------------------------
         if not follower_df.empty:
             merged_df = pd.merge(
                 display_df, 
@@ -77,19 +83,6 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
         st.write("")
 
         # ---------------------------------------------------------
-        # [NEW] 통합 보기 토글 버튼 (차트 위로 이동)
-        # ---------------------------------------------------------
-        merge_categories = False
-        
-        # '전체보기' 일 때만 버튼 표시
-        if selected_category == "전체보기":
-            # 오른쪽 정렬을 위해 컬럼 분할 (빈 공간 : 버튼 공간)
-            _, col_toggle = st.columns([0.8, 0.2])
-            with col_toggle:
-                # toggle_payout_view 키를 지정해 상태 유지
-                merge_categories = st.toggle("카테고리 통합 보기", value=False, key="toggle_payout_view")
-
-        # ---------------------------------------------------------
         # 1. 트리맵 차트
         # ---------------------------------------------------------
         display_df['chart_label'] = display_df.apply(
@@ -97,15 +90,9 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
             axis=1
         )
         
-        if merge_categories:
-            display_df['root_group'] = "전체 (All)"
-            path_list = ['root_group', 'chart_label']
-        else:
-            path_list = ['category', 'chart_label']
-
         fig = px.treemap(
             display_df, 
-            path=path_list, 
+            path=['category', 'chart_label'], 
             values='payout_amount', 
             color='payout_amount', 
             custom_data=['name', 'handle'],
@@ -139,7 +126,7 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
         with col_head:
             st.subheader("📋 주급 랭킹 (Payout Ranking)")
         with col_toggle:
-            expand_view = st.toggle("전체 펼치기", value=False, key="payout_ranking_toggle")
+            expand_view = st.toggle("전체 펼치기", value=False, key="payout_toggle")
 
         ranking_df = display_df.sort_values(by='payout_amount', ascending=False).reset_index(drop=True)
         
