@@ -25,20 +25,20 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
     /* ------------------------------------------------------- */
-    /* [수정] 뉴스 티커 (News Ticker) - 화면 상단 고정 */
+    /* [뉴스 티커] 상단 고정 스타일 */
     /* ------------------------------------------------------- */
     .ticker-container {
-        position: fixed; /* 스크롤해도 고정 */
+        position: fixed;
         top: 0;
         left: 0;
         width: 100%;
-        height: 50px; /* 티커 높이 고정 */
+        height: 50px;
         background-color: #16191E;
         border-bottom: 1px solid #2D3035;
         overflow: hidden;
         white-space: nowrap;
         padding: 12px 0;
-        z-index: 999999; /* 다른 요소들보다 위에 표시 */
+        z-index: 999999;
         display: flex;
         align-items: center;
     }
@@ -46,7 +46,7 @@ st.markdown("""
     .ticker-wrapper {
         display: inline-block;
         padding-left: 100%;
-        animation: ticker 35s linear infinite; /* 속도 조절 */
+        animation: ticker 45s linear infinite; /* 데이터가 많을 수 있으니 속도 조절 */
     }
     
     .ticker-item {
@@ -54,13 +54,18 @@ st.markdown("""
         font-size: 14px;
         color: #E0E0E0;
         font-weight: 500;
-        padding-right: 60px; /* 항목 간격 */
+        padding-right: 60px;
     }
     
     .ticker-highlight {
-        color: #10B981; /* 강조 색상 (녹색) */
+        color: #10B981; /* 이름 강조 (녹색) */
         font-weight: 700;
-        margin-right: 6px;
+    }
+    
+    .ticker-handle {
+        color: #9CA3AF; /* 핸들 (회색) */
+        font-size: 12px;
+        margin-right: 8px;
     }
 
     @keyframes ticker {
@@ -68,13 +73,13 @@ st.markdown("""
         100% { transform: translate3d(-100%, 0, 0); }
     }
 
-    /* [중요] 티커가 고정되면서 컨텐츠가 가려지지 않도록 메인 영역 상단 여백 추가 */
+    /* 메인 컨텐츠 상단 여백 확보 (티커에 가려지지 않게) */
     .main .block-container {
-        padding-top: 80px !important; /* 기존보다 더 아래로 밀기 */
+        padding-top: 80px !important;
     }
 
     /* ------------------------------------------------------- */
-    /* 사이드바 메뉴 스타일 (세로형 알약 버튼) */
+    /* 사이드바 스타일 (세로형 알약 버튼) */
     /* ------------------------------------------------------- */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] { 
         display: flex; flex-direction: column !important; gap: 6px; 
@@ -105,7 +110,7 @@ st.markdown("""
         color: #FFFFFF !important; font-weight: 700; 
     }
 
-    /* 기타 UI 스타일 */
+    /* 기타 UI 요소 스타일 */
     .sidebar-header { font-size: 11px; font-weight: 700; color: #E0E0E0; margin-top: 15px; margin-bottom: 5px; padding-left: 8px; text-transform: uppercase; opacity: 0.9; }
     .visitor-box { background-color: #1C1F26; border: 1px solid #2D3035; border-radius: 12px; padding: 15px; margin-top: 20px; text-align: center; }
     .vis-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1px; }
@@ -163,7 +168,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 로드
+# 3. 데이터 로드 (티커를 위해 전역 호출)
 conn = st.connection("gsheets", type=GSheetsConnection)
 total_visitors, today_visitors = visitor_logic.update_visitor_count(conn)
 
@@ -173,14 +178,21 @@ def get_sheet_data():
         df = conn.read(ttl="0") 
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
+            
+            # 모든 텍스트 컬럼 초기화
             cols_to_check = ['handle', 'name', 'category', 'recent_interest', 'note']
             for col in cols_to_check:
                 if col not in df.columns: df[col] = "" 
                 df[col] = df[col].fillna("").astype(str)
+            
             mask = (df['name'] == "") | (df['name'] == "nan")
             df.loc[mask, 'name'] = df.loc[mask, 'handle']
+            
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'recent_interest', 'note'])
+
+# [중요] 앱 시작 시 데이터 로드 (티커 표시용)
+df = get_sheet_data()
 
 # 4. 사이드바 구성
 with st.sidebar:
@@ -209,14 +221,35 @@ with menu_placeholder.container():
     menu = st.radio(" ", menu_options, label_visibility="collapsed")
 
 # ---------------------------------------------------------
-# [NEW] 뉴스 티커 (상단 고정)
+# [NEW] 실시간 데이터 기반 뉴스 티커 (상단 고정)
 # ---------------------------------------------------------
-ticker_messages = [
-    "📢 <span class='ticker-highlight'>NOTICE</span> 트위터 팔로워 데이터는 매일 자정에 업데이트 됩니다.",
-    "💰 <span class='ticker-highlight'>UPDATE</span> 이번 주 트위터 주급 정산 내역이 갱신되었습니다.",
-    "🏆 <span class='ticker-highlight'>EVENT</span> 텔레그램 채널에서 진행 중인 이벤트를 확인하세요!",
-    "🚀 Raoni Map에 오신 것을 환영합니다."
-]
+ticker_messages = []
+
+# 데이터가 있고, 'recent_interest' 컬럼이 존재할 때
+if not df.empty and 'recent_interest' in df.columns:
+    # 최근 관심사가 있는(빈칸이 아닌) 계정만 필터링
+    valid_df = df[df['recent_interest'].str.strip() != ""]
+    
+    # 랜덤으로 섞어서 보여주거나, 팔로워 순으로 보여줄 수 있음 (여기선 그냥 순서대로)
+    for _, row in valid_df.iterrows():
+        # HTML 이스케이프 처리 (특수문자 깨짐 방지)
+        safe_name = html.escape(str(row['name']))
+        safe_handle = html.escape(str(row['handle']))
+        safe_interest = html.escape(str(row['recent_interest']))
+        
+        # 메시지 포맷: [이름] (@핸들): 최근관심사
+        msg = f"<span class='ticker-highlight'>{safe_name}</span> <span class='ticker-handle'>(@{safe_handle})</span> {safe_interest}"
+        ticker_messages.append(msg)
+
+# 데이터가 없거나 관심사가 하나도 없으면 기본 환영 메시지 표시
+if not ticker_messages:
+    ticker_messages = [
+        "🚀 <span class='ticker-highlight'>Raoni Map</span>에 오신 것을 환영합니다.",
+        "📢 트위터 팔로워 데이터는 매일 업데이트 됩니다.",
+        "💰 주급 맵에서 최신 수익 인증 내역을 확인하세요."
+    ]
+
+# 리스트를 하나의 HTML 문자열로 결합
 ticker_items_html = "".join([f'<div class="ticker-item">{msg}</div>' for msg in ticker_messages])
 
 st.markdown(f"""
@@ -231,14 +264,14 @@ st.markdown(f"""
 # [PAGE 1] 트위터 팔로워 맵
 # ==========================================
 if menu == "트위터 팔로워 맵":
-    if 'df' not in locals() or df.empty: df = get_sheet_data()
+    # 이미 로드된 df 전달
     follower_logic.render_follower_page(conn, df)
 
 # ==========================================
-# [PAGE 2] 트위터 주급 맵 (NEW)
+# [PAGE 2] 트위터 주급 맵
 # ==========================================
 elif menu == "트위터 주급 맵":
-    if 'df' not in locals() or df.empty: df = get_sheet_data()
+    # 이미 로드된 df 전달
     payout_logic.render_payout_page(conn, df)
 
 # ==========================================
