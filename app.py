@@ -1,3 +1,31 @@
+네, 아주 현실적이고 좋은 접근입니다! 👍
+
+매번 바뀌는 "최신 트윗" 대신, **계정의 핵심 요약(Bio)이나 소개글**을 보여주는 방식은 **관리가 훨씬 쉽고(자주 안 바꿔도 됨), 에러 날 일도 없습니다.**
+
+구글 시트의 컬럼명을 `last_tweet` 대신 **`bio`**(소개글)로 바꾸고, 디자인을 **"프로필 카드"** 느낌으로 다듬어 드리겠습니다.
+
+---
+
+### 📋 1단계: 구글 스프레드시트 수정 (필수)
+
+사용 중인 시트의 헤더를 수정해주세요.
+
+| 기존 헤더 | **변경 후** | 내용 예시 |
+| --- | --- | --- |
+| `last_tweet` | **`bio`** | "대한민국 No.1 크립토 인플루언서 / 비트코인 분석" |
+
+*(내용은 한 번만 적어두면 계속 쓸 수 있어 편합니다.)*
+
+---
+
+### 🏆 2단계: 요약 정보(Bio)가 나오는 최종 `app.py`
+
+**[변경된 점]**
+
+1. **데이터 로드:** `last_tweet` 대신 **`bio`** 컬럼을 불러옵니다.
+2. **디자인:** 클릭 시 나오는 박스 제목을 `📢 LATEST TWEET` → **`📝 PROFILE BIO`**로 변경하고, 글씨 스타일을 더 깔끔하게 다듬었습니다.
+
+```python
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
@@ -84,41 +112,40 @@ st.markdown("""
     .metric-delta { font-size: 14px; font-weight: 500; margin-top: 5px; }
     .delta-up { color: #10B981; } .delta-down { color: #EF4444; }
     
-    /* [수정] 리더보드 스타일 (Accordion) */
-    /* summary 태그의 기본 삼각형 숨기기 */
+    /* [리더보드 & 아코디언 스타일] */
     details > summary { list-style: none; outline: none; cursor: pointer; }
     details > summary::-webkit-details-marker { display: none; }
     
     .ranking-row { 
         display: flex; align-items: center; justify-content: space-between; 
         background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
-        padding: 8px 12px; margin-bottom: 0px; /* details 안에 들어갈거라 마진 제거 */
+        padding: 8px 12px; margin-bottom: 0px; 
         transition: all 0.2s ease; 
     }
     .ranking-row:hover { border-color: #10B981; background-color: #1C1F26; }
     
-    /* 클릭 시 열리는 트윗 박스 스타일 */
-    .tweet-box {
-        background-color: #15171B; /* 더 어두운 배경 */
+    /* 요약 정보(Bio) 박스 스타일 */
+    .bio-box {
+        background-color: #15171B;
         border: 1px solid #2D3035;
-        border-top: none; /* 위쪽 경계선 제거 (자연스럽게 연결) */
+        border-top: none; 
         border-bottom-left-radius: 6px;
         border-bottom-right-radius: 6px;
         padding: 15px 20px;
         margin-bottom: 8px;
-        margin-top: -2px; /* 살짝 올려서 붙이기 */
+        margin-top: -2px; 
         animation: fadeIn 0.3s ease-in-out;
     }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
     
-    .tweet-header { font-size: 11px; color: #10B981; font-weight: 700; margin-bottom: 5px; display: flex; align-items: center; }
-    .tweet-content { font-size: 14px; color: #E5E7EB; line-height: 1.5; font-style: italic; }
-    .tweet-link-btn {
-        display: inline-block; margin-top: 10px; font-size: 11px; 
-        color: #3B82F6; text-decoration: none; border: 1px solid #2D3035; 
-        padding: 3px 8px; border-radius: 12px; transition: all 0.2s;
+    .bio-header { font-size: 11px; color: #60A5FA; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; letter-spacing: 0.5px;}
+    .bio-content { font-size: 14px; color: #D1D5DB; line-height: 1.6; font-weight: 400; }
+    .bio-link-btn {
+        display: inline-block; margin-top: 12px; font-size: 12px; 
+        color: #10B981; text-decoration: none; border: 1px solid #2D3035; 
+        padding: 4px 10px; border-radius: 4px; transition: all 0.2s; background-color: #1F2937;
     }
-    .tweet-link-btn:hover { background-color: #1C1F26; color: #60A5FA; }
+    .bio-link-btn:hover { background-color: #10B981; color: #FFFFFF; border-color: #10B981; }
 
     .rank-num { font-size: 15px; font-weight: bold; color: #10B981; width: 25px; }
     .rank-img { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #2D3035; margin-right: 10px; object-fit: cover; }
@@ -154,12 +181,12 @@ def get_sheet_data():
             if 'name' not in df.columns: df['name'] = df['handle'] 
             else: df['name'] = df['name'].fillna(df['handle'])
             
-            # [NEW] last_tweet 컬럼 가져오기 (없으면 빈칸 처리)
-            if 'last_tweet' not in df.columns: df['last_tweet'] = ""
-            else: df['last_tweet'] = df['last_tweet'].fillna("")
+            # [수정] bio 컬럼 가져오기 (없으면 '정보 없음' 처리)
+            if 'bio' not in df.columns: df['bio'] = "소개글이 없습니다."
+            else: df['bio'] = df['bio'].fillna("소개글이 없습니다.")
             
         return df
-    except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'last_tweet'])
+    except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'bio'])
 
 # 4. 사이드바 구성
 with st.sidebar:
@@ -260,7 +287,7 @@ if menu == "트위터 팔로워 맵":
 
             st.write("")
             st.subheader("🏆 팔로워 순위 (Leaderboard)")
-            st.caption("카드를 클릭하면 최신 트윗을 볼 수 있습니다.") # 안내 문구 추가
+            st.caption("카드를 클릭하면 상세 정보를 볼 수 있습니다.")
             
             ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
             view_total = ranking_df['followers'].sum()
@@ -272,10 +299,10 @@ if menu == "트위터 팔로워 맵":
                 img_url = f"https://unavatar.io/twitter/{row['handle']}"
                 share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
                 
-                # [NEW] 최신 트윗 내용 가져오기
-                tweet_content = row['last_tweet'] if row['last_tweet'] else "최신 트윗 정보가 없습니다."
+                # [수정] Bio 정보 가져오기
+                bio_content = row['bio'] if row['bio'] else "소개글이 없습니다."
                 
-                # [NEW] details 태그를 활용한 클릭 확장 기능
+                # [수정] 박스 타이틀을 PROFILE BIO로 변경
                 list_html += f"""
                 <details>
                     <summary>
@@ -291,11 +318,11 @@ if menu == "트위터 팔로워 맵":
                             <div class="rank-followers">{int(row['followers']):,}</div>
                         </div>
                     </summary>
-                    <div class="tweet-box">
-                        <div class="tweet-header">📢 LATEST TWEET</div>
-                        <div class="tweet-content">"{tweet_content}"</div>
-                        <a href="https://twitter.com/{row['handle']}" target="_blank" class="tweet-link-btn">
-                            트위터 바로가기 ↗
+                    <div class="bio-box">
+                        <div class="bio-header">📝 PROFILE BIO</div>
+                        <div class="bio-content">{bio_content}</div>
+                        <a href="https://twitter.com/{row['handle']}" target="_blank" class="bio-link-btn">
+                            Visit Profile ↗
                         </a>
                     </div>
                 </details>
@@ -330,3 +357,5 @@ if is_admin:
             st.cache_data.clear()
             st.rerun()
     with col2: st.write("👈 데이터를 새로고침합니다.")
+
+```
