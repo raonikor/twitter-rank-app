@@ -290,6 +290,12 @@ elif menu == "트위터 주급 맵":
         if not p_df.empty:
             p_cats.extend(sorted(p_df['category'].unique().tolist()))
         selected_category = st.radio("카테고리 선택", p_cats, label_visibility="collapsed", key="payout_cat")
+        
+        # [NEW] 전체보기일 때 통합 보기 토글 표시
+        merge_categories = False
+        if selected_category == "전체보기":
+            st.write("") 
+            merge_categories = st.toggle("카테고리 통합 보기", value=False)
 
 
 # ==========================================
@@ -433,7 +439,12 @@ elif menu == "트위터 주급 맵":
     # 팔로워 데이터가 로드되어 있는지 확인하고 전달
     if 'df' not in locals() or df.empty:
         df = get_sheet_data()
-    payout_logic.render_payout_page(conn, df, selected_category)
+    
+    # merge_categories 변수가 위에서 정의되었으므로 전달 가능
+    # (혹시 변수가 없을 경우를 대비해 기본값 처리)
+    if 'merge_categories' not in locals(): merge_categories = False
+        
+    payout_logic.render_payout_page(conn, df, selected_category, merge_categories)
 
 # ==========================================
 # [PAGE 3] 실시간 트위터
