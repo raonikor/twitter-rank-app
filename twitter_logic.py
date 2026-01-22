@@ -4,13 +4,11 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 
-# [수정] 인자 이름 앞에 언더바(_) 추가: _conn
-# 이렇게 하면 Streamlit이 캐싱할 때 이 객체는 무시합니다.
-@st.cache_data(ttl="30m")
-def get_payout_data(_conn): 
+# [수정] @st.cache_data 제거 -> conn.read의 ttl 기능을 사용하여 해결
+def get_payout_data(conn): 
     try:
-        # 내부에서도 _conn으로 사용
-        df = _conn.read(worksheet="payouts", ttl="0") 
+        # ttl="30m"을 설정하여 여기서 30분간 데이터를 캐싱합니다.
+        df = conn.read(worksheet="payouts", ttl="30m") 
         
         if df is not None and not df.empty:
             # 숫자 변환 (콤마 제거 등 안전장치)
@@ -25,6 +23,7 @@ def get_payout_data(_conn):
             
         return df
     except Exception as e:
+        # 에러 발생 시 빈 데이터프레임 반환
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category'])
 
 # 2. 주급 맵 렌더링
@@ -32,7 +31,7 @@ def render_payout_page(conn):
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
     st.caption("이번 주 트위터 수익 정산 현황")
 
-    # 호출할 때는 그냥 conn을 넘겨주면 됩니다. (받는 쪽이 _conn으로 받음)
+    # 함수 호출 (캐싱 데코레이터가 없으므로 일반적인 함수 호출과 동일하게 안전함)
     df = get_payout_data(conn)
     
     if not df.empty:
