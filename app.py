@@ -46,7 +46,8 @@ st.markdown("""
     .ticker-wrapper {
         display: inline-block;
         padding-left: 100%;
-        animation: ticker 45s linear infinite; /* 데이터가 많을 수 있으니 속도 조절 */
+        /* [수정] 속도 조절: 120s (숫자가 클수록 느려짐) */
+        animation: ticker 120s linear infinite; 
     }
     
     .ticker-item {
