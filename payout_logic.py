@@ -16,7 +16,7 @@ def get_payout_data(conn):
             ).fillna(0)
             
             df['category'] = df['category'].fillna('미분류')
-            df['handle'] = df['handle'].astype(str).str.strip() # 공백 제거
+            df['handle'] = df['handle'].astype(str).str.strip()
             
             # 이름 없으면 핸들로 대체
             if 'name' not in df.columns: df['name'] = df['handle']
@@ -30,8 +30,67 @@ def get_payout_data(conn):
     except Exception as e:
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category', 'bio'])
 
-# 2. 주급 맵 렌더링 (인자: conn, follower_df 단 2개!)
+# 2. 주급 맵 렌더링
 def render_payout_page(conn, follower_df):
+    # ---------------------------------------------------------
+    # [CSS] 카테고리 버튼 스타일링 (알약 모양)
+    # ---------------------------------------------------------
+    st.markdown("""
+    <style>
+    /* 가로형 라디오 버튼 컨테이너 */
+    div[role="radiogroup"] {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* 버튼(Label) 기본 스타일 */
+    div[role="radiogroup"] label {
+        background-color: #1C1F26; /* 어두운 배경 */
+        border: 1px solid #2D3035;
+        border-radius: 20px !important; /* 둥근 모서리 */
+        padding: 6px 16px !important;
+        margin-right: 0px;
+        transition: all 0.2s ease;
+        justify-content: center;
+        width: auto !important;
+    }
+
+    /* 기본 라디오 버튼(동그라미) 숨기기 */
+    div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+
+    /* 텍스트 스타일 */
+    div[role="radiogroup"] label p {
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        color: #B0B3B8 !important;
+        margin: 0 !important;
+    }
+
+    /* [선택됨] 상태 스타일 */
+    div[role="radiogroup"] label:has(input:checked) {
+        background-color: #004A77 !important; /* 파란색 강조 */
+        border-color: #004A77 !important;
+    }
+    
+    /* [선택됨] 텍스트 색상 */
+    div[role="radiogroup"] label:has(input:checked) p {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+    }
+
+    /* 마우스 오버 효과 */
+    div[role="radiogroup"] label:hover {
+        border-color: #004A77;
+        background-color: #252830;
+        cursor: pointer;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
     st.caption("이번 주 트위터 수익 정산 현황")
 
@@ -42,15 +101,15 @@ def render_payout_page(conn, follower_df):
         display_df = payout_df[payout_df['payout_amount'] > 0]
         
         # ---------------------------------------------------------
-        # [UI] 메인 화면 컨트롤러 (가로형 카테고리 버튼)
+        # [UI] 메인 화면 컨트롤러
         # ---------------------------------------------------------
         all_cats = ["전체보기"] + sorted(display_df['category'].unique().tolist())
         
-        # 화면 분할 (왼쪽: 카테고리 버튼 / 오른쪽: 통합 토글)
+        # 화면 분할
         col_cat, col_opt = st.columns([0.8, 0.2])
         
         with col_cat:
-            # 팔로워 맵과 동일한 스타일 (가로형)
+            st.write("카테고리 선택") # 라벨 명시 (디자인 통일)
             selected_category = st.radio(
                 "카테고리 선택", 
                 all_cats, 
@@ -61,8 +120,9 @@ def render_payout_page(conn, follower_df):
             
         with col_opt:
             merge_categories = False
-            # '전체보기'일 때만 통합 토글 표시
             if selected_category == "전체보기":
+                st.write("") # 줄맞춤용 공백
+                st.write("") 
                 merge_categories = st.toggle("통합 보기", value=False, key="payout_merge_toggle")
 
         st.write("") # 간격 추가
@@ -78,7 +138,7 @@ def render_payout_page(conn, follower_df):
             return
 
         # ---------------------------------------------------------
-        # [핵심] 팔로워 데이터와 병합 (Merge)
+        # [핵심] 팔로워 데이터와 병합
         # ---------------------------------------------------------
         if not follower_df.empty:
             merged_df = pd.merge(
@@ -118,7 +178,6 @@ def render_payout_page(conn, follower_df):
             axis=1
         )
         
-        # 통합 보기 로직
         path_list = ['root_group', 'chart_label'] if merge_categories else ['category', 'chart_label']
         if merge_categories: display_df['root_group'] = "전체 (All)"
         
@@ -128,7 +187,6 @@ def render_payout_page(conn, follower_df):
             values='payout_amount', 
             color='payout_amount', 
             custom_data=['name', 'handle'],
-            # 팔로워 맵과 동일한 그라데이션
             color_continuous_scale=[(0.00, '#2E2B4E'), (0.05, '#353263'), (0.10, '#3F3C5C'), (0.15, '#464282'), (0.20, '#4A477A'), (0.25, '#4A5D91'), (0.30, '#4A6FA5'), (0.35, '#537CA8'), (0.40, '#5C8BAE'), (0.45, '#5C98AE'), (0.50, '#5E9CA8'), (0.55, '#5E9E94'), (0.60, '#5F9E7F'), (0.65, '#729E6F'), (0.70, '#859E5F'), (0.75, '#969E5F'), (0.80, '#A89E5F'), (0.85, '#AD905D'), (0.90, '#AE815C'), (0.95, '#AE6E5C'), (1.00, '#AE5C5C')],
             template="plotly_dark"
         )
@@ -161,7 +219,6 @@ def render_payout_page(conn, follower_df):
         with col_toggle:
             expand_view = st.toggle("전체 펼치기", value=False, key="payout_toggle")
 
-        # 주급 순 정렬
         ranking_df = display_df.sort_values(by='payout_amount', ascending=False).reset_index(drop=True)
         
         list_html = ""
@@ -170,10 +227,8 @@ def render_payout_page(conn, follower_df):
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
             
-            # 바이오 정보
             bio_content = row['bio'] if row['bio'] else "수익 인증 상세 정보가 없습니다."
             
-            # 팔로워 수 (데이터 병합됨)
             follower_count = int(row['followers']) if 'followers' in row else 0
             follower_text = f"{follower_count:,}"
 
@@ -190,7 +245,7 @@ def render_payout_page(conn, follower_df):
                             <div class="rank-handle">@{row['handle']}</div>
                         </div>
                         <div class="rank-extra">
-                             </div>
+                        </div>
                         <div class="rank-stats-group" style="width: 200px;"> 
                             <div class="rank-category" style="background-color: #1F2937; color: #9CA3AF;">👥 {follower_text}</div>
                             <div class="rank-followers" style="width: 80px; color: #10B981;">${int(row['payout_amount']):,}</div>
