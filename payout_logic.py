@@ -3,55 +3,73 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 
-# 1. 주급 데이터 가져오기 (캐싱 에러 방지를 위해 ttl 사용)
+# 1. 주급 데이터 가져오기
 def get_payout_data(conn): 
     try:
-        # 30분 캐시
         df = conn.read(worksheet="payouts", ttl="30m") 
-        
         if df is not None and not df.empty:
-            # 숫자 변환 (콤마 제거)
             df['payout_amount'] = pd.to_numeric(
                 df['payout_amount'].astype(str).str.replace(',', ''), errors='coerce'
             ).fillna(0)
-            
             df['category'] = df['category'].fillna('미분류')
             df['handle'] = df['handle'].astype(str).str.strip()
-            
-            # 이름 없으면 핸들로 대체
             if 'name' not in df.columns: df['name'] = df['handle']
             else: df['name'] = df['name'].fillna(df['handle'])
-            
-            # bio 컬럼 처리
             if 'bio' not in df.columns: df['bio'] = ""
             else: df['bio'] = df['bio'].fillna("")
-            
         return df
     except Exception as e:
         return pd.DataFrame(columns=['handle', 'name', 'payout_amount', 'category', 'bio'])
 
-# 2. 주급 맵 렌더링 (카테고리 필터 기능 추가됨)
-def render_payout_page(conn, follower_df, selected_category="전체보기"):
+# 2. 주급 맵 렌더링 (인자 개수 축소: conn, follower_df 2개만 받음)
+def render_payout_page(conn, follower_df):
     st.title("💰 트위터 주급 맵 (Weekly Payout)")
-    st.caption(f"이번 주 트위터 수익 정산 현황 - {selected_category}")
+    st.caption("이번 주 트위터 수익 정산 현황")
 
     payout_df = get_payout_data(conn)
     
     if not payout_df.empty:
-        # 0원인 사람은 제외
+        # 0원 제외
         display_df = payout_df[payout_df['payout_amount'] > 0]
         
-        # [NEW] 카테고리 필터링 적용
+        # ---------------------------------------------------------
+        # [NEW] 카테고리 선택 & 통합 보기 버튼을 메인 화면에 배치
+        # ---------------------------------------------------------
+        # 카테고리 목록 생성
+        all_cats = ["전체보기"] + sorted(display_df['category'].unique().tolist())
+        
+        # 화면 분할 (왼쪽: 카테고리 버튼 / 오른쪽: 통합 토글)
+        col_cat, col_opt = st.columns([0.75, 0.25])
+        
+        with col_cat:
+            # 가로형 라디오 버튼 (메인 화면 배치)
+            selected_category = st.radio(
+                "카테고리 선택", 
+                all_cats, 
+                horizontal=True, 
+                label_visibility="collapsed",
+                key="payout_category_main"
+            )
+            
+        with col_opt:
+            # 전체보기일 때만 토글 표시
+            merge_categories = False
+            if selected_category == "전체보기":
+                merge_categories = st.toggle("통합 보기", value=False, key="payout_merge_toggle")
+
+        st.divider() # 구분선 추가
+
+        # ---------------------------------------------------------
+        # 데이터 필터링
+        # ---------------------------------------------------------
         if selected_category != "전체보기":
             display_df = display_df[display_df['category'] == selected_category]
         
         if display_df.empty:
-            st.info(f"'{selected_category}' 카테고리에 해당하는 데이터가 없습니다.")
+            st.info(f"'{selected_category}' 데이터가 없습니다.")
             return
 
-        # ---------------------------------------------------------
-        # 팔로워 데이터와 병합 (Merge)
-        # ---------------------------------------------------------
+        # 팔로워 데이터 병합
         if not follower_df.empty:
             merged_df = pd.merge(
                 display_df, 
@@ -83,16 +101,22 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
         st.write("")
 
         # ---------------------------------------------------------
-        # 1. 트리맵 차트
+        # 트리맵 차트
         # ---------------------------------------------------------
         display_df['chart_label'] = display_df.apply(
             lambda x: f"{str(x['name'])}<br><span style='font-size:0.7em; font-weight:normal;'>@{str(x['handle'])}</span>", 
             axis=1
         )
         
+        if merge_categories:
+            display_df['root_group'] = "전체 (All)"
+            path_list = ['root_group', 'chart_label']
+        else:
+            path_list = ['category', 'chart_label']
+
         fig = px.treemap(
             display_df, 
-            path=['category', 'chart_label'], 
+            path=path_list, 
             values='payout_amount', 
             color='payout_amount', 
             custom_data=['name', 'handle'],
@@ -120,13 +144,13 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
         st.write("")
 
         # ---------------------------------------------------------
-        # 2. 리더보드 리스트
+        # 리더보드 리스트
         # ---------------------------------------------------------
         col_head, col_toggle = st.columns([1, 0.3])
         with col_head:
             st.subheader("📋 주급 랭킹 (Payout Ranking)")
         with col_toggle:
-            expand_view = st.toggle("전체 펼치기", value=False, key="payout_toggle")
+            expand_view = st.toggle("전체 펼치기", value=False, key="payout_ranking_toggle")
 
         ranking_df = display_df.sort_values(by='payout_amount', ascending=False).reset_index(drop=True)
         
@@ -137,7 +161,6 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
             img_url = f"https://unavatar.io/twitter/{row['handle']}"
             
             bio_content = row['bio'] if row['bio'] else "수익 인증 상세 정보가 없습니다."
-            
             follower_count = int(row['followers']) if 'followers' in row else 0
             follower_text = f"{follower_count:,}"
 
@@ -153,8 +176,7 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
                             <div class="rank-name">{row['name']}</div>
                             <div class="rank-handle">@{row['handle']}</div>
                         </div>
-                        <div class="rank-extra">
-                        </div>
+                        <div class="rank-extra"></div>
                         <div class="rank-stats-group" style="width: 200px;">
                             <div class="rank-category" style="background-color: #1F2937; color: #9CA3AF;">👥 {follower_text}</div>
                             <div class="rank-followers" style="width: 80px; color: #10B981;">${int(row['payout_amount']):,}</div>
@@ -164,9 +186,7 @@ def render_payout_page(conn, follower_df, selected_category="전체보기"):
                 <div class="bio-box">
                     <div class="bio-header">💰 PAYOUT INFO</div>
                     <div class="bio-content">{bio_content}</div>
-                    <a href="https://twitter.com/{row['handle']}" target="_blank" class="bio-link-btn">
-                        Visit Profile ↗
-                    </a>
+                    <a href="https://twitter.com/{row['handle']}" target="_blank" class="bio-link-btn">Visit Profile ↗</a>
                 </div>
             </details>
             """
