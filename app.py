@@ -47,7 +47,7 @@ st.markdown("""
         display: inline-block;
         padding-left: 100%;
         /* [수정] 속도 조절: 120s (숫자가 클수록 느려짐) */
-        animation: ticker 2000s linear infinite; 
+        animation: ticker 2500s linear infinite; 
     }
     
     .ticker-item {
@@ -296,6 +296,7 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
+
 
 
 
