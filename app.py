@@ -83,7 +83,7 @@ st.markdown("""
     .metric-label { font-size: 14px; color: #9CA3AF; margin-bottom: 5px; }
     .metric-value { font-size: 28px; font-weight: 700; color: #FFFFFF; }
     
-    /* 리더보드 리스트 스타일 */
+    /* [수정됨] 리더보드 리스트 스타일 */
     .ranking-row { 
         display: flex; align-items: center; 
         background-color: #16191E; border: 1px solid #2D3035; border-radius: 6px; 
@@ -101,27 +101,26 @@ st.markdown("""
     .rank-name { font-size: 15px; font-weight: 700; color: #FFFFFF !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
     .rank-handle { font-size: 12px; font-weight: 400; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;}
     
-    /* [수정됨] 1줄 배치 (Flex Row) */
+    /* [수정됨] 요약 & 비고 1줄 배치 (안정성 강화) */
     .rank-extra { 
         flex-grow: 1; 
         min-width: 0; 
+        min-height: 24px; /* 최소 높이 보장 (내용 없어도 찌그러짐 방지) */
         display: flex; 
-        flex-direction: row; /* 가로 배치 */
-        align-items: center; /* 수직 중앙 정렬 */
-        gap: 8px; /* 항목 사이 간격 */
+        flex-direction: row; 
+        align-items: center; 
+        gap: 8px; 
         overflow: hidden;
     }
     
-    /* 1. 요약 (빨간색 텍스트) */
     .rank-interest { 
         font-size: 13px; 
         color: #FF5252 !important; /* 빨간색 */
         font-weight: 700; 
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-        margin-bottom: 0; /* 마진 제거 */
+        margin-bottom: 0;
     }
     
-    /* 2. 비고 (노란색 버튼) */
     .rank-note { 
         font-size: 11px; 
         color: #000000; 
@@ -130,7 +129,7 @@ st.markdown("""
         border-radius: 12px; 
         font-weight: 600;
         white-space: nowrap; 
-        flex-shrink: 0; /* 버튼이 찌그러지지 않게 고정 */
+        flex-shrink: 0; 
     }
 
     .rank-stats-group { display: flex; align-items: center; justify-content: flex-end; width: 180px; flex-shrink: 0; }
@@ -160,7 +159,7 @@ def get_sheet_data():
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
             
-            # 데이터 정제 (강제 문자열 변환)
+            # [중요] 모든 텍스트 컬럼 강제 초기화 (NaN -> 빈 문자열)
             cols_to_check = ['handle', 'name', 'category', 'recent_interest', 'note']
             for col in cols_to_check:
                 if col not in df.columns: df[col] = "" 
@@ -239,7 +238,6 @@ if menu == "트위터 팔로워 맵":
         st.write("")
 
         if not display_df.empty:
-            # 차트 라벨
             display_df['chart_label'] = display_df.apply(
                 lambda x: f"{str(x['name'])}<br><span style='font-size:0.7em; font-weight:normal;'>@{str(x['handle'])}</span>", 
                 axis=1
@@ -278,6 +276,13 @@ if menu == "트위터 팔로워 맵":
             ranking_df = display_df.sort_values(by='followers', ascending=False).reset_index(drop=True)
             view_total = ranking_df['followers'].sum()
             
+            # [NEW] 데이터 안전 정제 함수
+            def clean_str(val):
+                if pd.isna(val): return ""
+                s = str(val).strip()
+                if s.lower() == 'nan': return ""
+                return s
+
             list_html = ""
             for index, row in ranking_df.iterrows():
                 rank = index + 1
@@ -285,21 +290,16 @@ if menu == "트위터 팔로워 맵":
                 img_url = f"https://unavatar.io/twitter/{row['handle']}"
                 share_pct = (row['followers'] / view_total * 100) if view_total > 0 else 0
                 
-                # 데이터 안전 처리
-                recent_raw = str(row['recent_interest']).strip()
-                note_raw = str(row['note']).strip()
+                # 데이터 안전하게 가져오기 (여기서 99%의 에러가 차단됨)
+                recent_raw = clean_str(row.get('recent_interest', ''))
+                note_raw = clean_str(row.get('note', ''))
                 
-                if recent_raw.lower() == 'nan': recent_raw = ""
-                if note_raw.lower() == 'nan': note_raw = ""
-                
-                # HTML 이스케이프
+                # HTML 이스케이프 (특수문자 방어)
                 recent_safe = html.escape(recent_raw)
                 note_safe = html.escape(note_raw)
                 
-                # [수정됨] 특수문자 제거 후 순수 텍스트만 표시
-                interest_html = f"{recent_safe}" if recent_safe else ""
-                
-                # 비고가 있을 때만 노란 버튼 표시
+                # HTML 생성
+                interest_html = f"<div class='rank-interest'>{recent_safe}</div>" if recent_safe else ""
                 note_html = f"<span class='rank-note'>{note_safe}</span>" if note_safe else ""
                 
                 list_html += f"""
@@ -313,7 +313,7 @@ if menu == "트위터 팔로워 맵":
                         <div class="rank-handle">@{row['handle']}</div>
                     </div>
                     <div class="rank-extra">
-                        <div class="rank-interest">{interest_html}</div>
+                        {interest_html}
                         {note_html}
                     </div>
                     <div class="rank-stats-group">
