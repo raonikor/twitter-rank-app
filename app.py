@@ -273,7 +273,9 @@ if menu == "트위터 팔로워 맵":
 # [PAGE 1.5] 크립토 플젝맵 (NEW)
 # ==========================================
 elif menu == "크립토 플젝맵":
-    project_logic.render_project_page(conn)
+    # [수정] 팔로워 데이터(df)를 함께 전달합니다!
+    if 'df' not in locals() or df.empty: df = get_sheet_data()
+    project_logic.render_project_page(conn, df)
 
 # ==========================================
 # [PAGE 2] 트위터 주급 맵
@@ -303,3 +305,4 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
+
