@@ -47,7 +47,7 @@ def get_project_data(conn):
             df['category'] = df['category'].fillna("전체")
 
             # ---------------------------------------------------------
-            # 포인트(점수) 계산 -> 마인드쉐어 계산을 위한 기초값
+            # 포인트(점수) 및 마인드쉐어 계산
             # ---------------------------------------------------------
             max_mentions = df['mentions'].max()
             max_views = df['views'].max()
@@ -61,14 +61,13 @@ def get_project_data(conn):
                 (df['views'] / max_views) * 60
             )
             
-            # [NEW] 마인드쉐어(%) 계산
-            # 전체 점수 합계 대비 비율
+            # 마인드쉐어(%) 계산
             total_score = df['raw_score'].sum()
             if total_score == 0: total_score = 1
             
             df['mindshare'] = (df['raw_score'] / total_score) * 100
             
-            # 트리맵 크기 결정용 값 (여전히 raw_score 사용)
+            # 트리맵 크기용
             df['value'] = df['raw_score']
             
         return df
@@ -94,11 +93,11 @@ def render_project_page(conn, follower_df_raw):
     div[role="radiogroup"] label:has(input:checked) p { color: #FFFFFF !important; font-weight: 700 !important; }
     div[role="radiogroup"] label:hover { border-color: #004A77; background-color: #252830; cursor: pointer; }
     
-    /* [수정] 비고(Note) 텍스트가 잘리지 않고 줄바꿈되도록 수정 */
+    /* 비고 텍스트 줄바꿈 */
     .rank-interest {
-        white-space: normal !important; /* 줄바꿈 허용 */
-        overflow: visible !important;   /* 내용 다 보여줌 */
-        text-overflow: clip !important; /* ... 제거 */
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
         display: block !important;
         line-height: 1.4 !important;
         margin-top: 4px;
@@ -229,7 +228,7 @@ def render_project_page(conn, follower_df_raw):
     st.write("")
     
     # ---------------------------------------------------------
-    # 리스트 뷰
+    # 리스트 뷰 (HTML 구조 단순화)
     # ---------------------------------------------------------
     col_head, col_toggle = st.columns([1, 0.3])
     with col_head: st.subheader("📋 계정 랭킹 (Account Ranking)")
@@ -254,56 +253,28 @@ def render_project_page(conn, follower_df_raw):
         desc_raw = clean_str(row.get('desc', ''))
         desc_safe = html.escape(desc_raw)
         
-        # [수정] 마인드쉐어 (소수점 1자리)
         mindshare_text = f"{row['mindshare']:.1f}%"
-        
-        # [수정] 팔로워 수 (오른쪽 끝으로 이동할 데이터)
         follower_text = f"👥 {int(row['followers']):,}"
 
-        list_html += f"""
-        <details {'open' if expand_view else ''}>
-            <summary>
-                <div class="ranking-row">
-                    <div class="rank-col-1">
-                        <div class="rank-num">{medal}</div>
-                        <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
-                    </div>
-                    
-                    <div class="rank-info">
-                        <div class="rank-name">{row['real_name']}</div>
-                        <div class="rank-handle" style="font-size:11px; color:#9CA3AF;">{row['handle']}</div>
-                        <div style="font-size:12px; color:#10B981; font-weight:700; margin-top:2px;">
-                           Mindshare: {mindshare_text}
-                        </div>
-                    </div>
-                    
-                    <div class="rank-extra" style="display: block; white-space: normal; height: auto; padding: 4px 0;">
-                        <span class="rank-interest" style="font-weight:400; color:#D1D5DB !important; font-size:13px; line-height:1.4;">
-                            {desc_safe}
-                        </span>
-                    </div>
-                    
-                    <div class="rank-stats-group" style="width: 140px; justify-content: flex-end;">
-                        <div class="rank-followers" style="width:100%; color:#E5E7EB; font-size:14px; text-align:right;">
-                            {follower_text}
-                        </div>
-                    </div>
-                </div>
-            </summary>
-            
-            <div class="bio-box">
-                <div class="bio-header">📝 NOTE</div>
-                <div class="bio-content">{desc_safe if desc_safe else "비고 없음"}</div>
-                <div style="margin-top:10px; font-size:12px; color:#6B7280;">
-                    • Followers: {int(row['followers']):,}<br>
-                    • Mindshare Score: {row['mindshare']:.2f}%
-                </div>
-                <a href="https://twitter.com/{clean_id}" target="_blank" class="bio-link-btn">
-                    Visit Profile ↗
-                </a>
-            </div>
-        </details>
-        """
+        # [수정됨] 들여쓰기 문제를 방지하기 위해 한 줄로 연결하거나 들여쓰기 제거
+        list_html += f'''
+<details {'open' if expand_view else ''}>
+<summary>
+<div class="ranking-row">
+<div class="rank-col-1"><div class="rank-num">{medal}</div><img src="{img_url}" class="rank-img" onerror="this.style.display='none'"></div>
+<div class="rank-info"><div class="rank-name">{row['real_name']}</div><div class="rank-handle" style="font-size:11px; color:#9CA3AF;">{row['handle']}</div><div style="font-size:12px; color:#10B981; font-weight:700; margin-top:2px;">Mindshare: {mindshare_text}</div></div>
+<div class="rank-extra" style="display: block; white-space: normal; height: auto; padding: 4px 0;"><span class="rank-interest" style="font-weight:400; color:#D1D5DB !important; font-size:13px; line-height:1.4;">{desc_safe}</span></div>
+<div class="rank-stats-group" style="width: 140px; justify-content: flex-end;"><div class="rank-followers" style="width:100%; color:#E5E7EB; font-size:14px; text-align:right;">{follower_text}</div></div>
+</div>
+</summary>
+<div class="bio-box">
+<div class="bio-header">📝 NOTE</div>
+<div class="bio-content">{desc_safe if desc_safe else "비고 없음"}</div>
+<div style="margin-top:10px; font-size:12px; color:#6B7280;">• Followers: {int(row['followers']):,}<br>• Mindshare Score: {row['mindshare']:.2f}%</div>
+<a href="https://twitter.com/{clean_id}" target="_blank" class="bio-link-btn">Visit Profile ↗</a>
+</div>
+</details>
+'''
     
     with st.container(height=600 if not expand_view else None):
         st.markdown(list_html, unsafe_allow_html=True)
