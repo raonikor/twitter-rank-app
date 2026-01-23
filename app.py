@@ -4,17 +4,18 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 import html 
+import base64
+import os
 from datetime import datetime, timedelta, timezone
 
 # [모듈 불러오기]
-# 파일들이 같은 폴더에 있어야 합니다.
 import market_logic 
 import visitor_logic
 import event_logic 
 import twitter_logic
 import payout_logic
 import follower_logic
-import project_logic # [필수] 프로젝트 맵 모듈
+import project_logic 
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
@@ -79,6 +80,26 @@ st.markdown("""
     /* 메인 컨텐츠 상단 여백 확보 (티커에 가려지지 않게) */
     .main .block-container {
         padding-top: 80px !important;
+    }
+    
+    /* [배너 스타일] */
+    .banner-box {
+        width: 100%;
+        margin-bottom: 30px;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #2D3035;
+        transition: transform 0.2s, border-color 0.2s;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .banner-box:hover {
+        transform: scale(1.01);
+        border-color: #10B981;
+    }
+    .banner-img {
+        width: 100%;
+        height: auto;
+        display: block;
     }
 
     /* ------------------------------------------------------- */
@@ -252,6 +273,33 @@ st.markdown(f"""
         </div>
     </div>
 """, unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# [배너 광고] 메인 상단 (티커 아래)
+# ---------------------------------------------------------
+# 배너 설정 (폴더명/파일이름, 링크주소)
+banner_img_path = "images/banner.png"  
+banner_link = "https://t.me/Raoni1"   
+
+# 배너 렌더링 (파일이 있을 때만 표시)
+if os.path.exists(banner_img_path):
+    try:
+        # 이미지를 읽어서 Base64 문자열로 변환 (클릭 가능한 HTML용)
+        with open(banner_img_path, "rb") as f:
+            img_data = f.read()
+            b64_img = base64.b64encode(img_data).decode()
+        
+        # HTML로 배너 출력 (CSS 애니메이션 포함)
+        st.markdown(f"""
+            <a href="{banner_link}" target="_blank" style="text-decoration: none;">
+                <div class="banner-box">
+                    <img src="data:image/png;base64,{b64_img}" class="banner-img">
+                </div>
+            </a>
+        """, unsafe_allow_html=True)
+    except Exception as e:
+        # 에러 발생 시 조용히 넘어감 (배너 안 뜸)
+        pass
 
 # ==========================================
 # [PAGE 1] 트위터 팔로워 맵
