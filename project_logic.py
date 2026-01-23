@@ -7,6 +7,7 @@ import html
 # 1. 프로젝트 데이터 가져오기 및 포인트 계산
 def get_project_data(conn): 
     try:
+        # 캐시 없이 즉시 불러오기
         df = conn.read(worksheet="projects", ttl="0") 
         
         if df is not None and not df.empty:
@@ -33,7 +34,7 @@ def get_project_data(conn):
             if 'name' not in df.columns: df['name'] = "Unknown"
             df['name'] = df['name'].fillna("Unknown").astype(str).str.strip()
             
-            # 핸들 포맷 (@붙이기)
+            # 표준 핸들 포맷 (@붙이기)
             df['handle'] = df['name'].apply(lambda x: x if str(x).startswith('@') else f"@{x}")
             
             # [매칭 키] 소문자, 공백제거, @제거
@@ -45,27 +46,39 @@ def get_project_data(conn):
             if 'category' not in df.columns: df['category'] = "전체"
             df['category'] = df['category'].fillna("전체")
 
-            # 포인트 계산
+            # ---------------------------------------------------------
+            # 포인트(점수) 계산 -> 마인드쉐어 계산을 위한 기초값
+            # ---------------------------------------------------------
             max_mentions = df['mentions'].max()
             max_views = df['views'].max()
             
             if max_mentions == 0: max_mentions = 1
             if max_views == 0: max_views = 1
             
-            df['calculated_score'] = (
+            # 기본 점수 산출
+            df['raw_score'] = (
                 (df['mentions'] / max_mentions) * 40 + 
                 (df['views'] / max_views) * 60
             )
-            df['value'] = df['calculated_score'].round(1)
+            
+            # [NEW] 마인드쉐어(%) 계산
+            # 전체 점수 합계 대비 비율
+            total_score = df['raw_score'].sum()
+            if total_score == 0: total_score = 1
+            
+            df['mindshare'] = (df['raw_score'] / total_score) * 100
+            
+            # 트리맵 크기 결정용 값 (여전히 raw_score 사용)
+            df['value'] = df['raw_score']
             
         return df
     except Exception as e:
-        return pd.DataFrame(columns=['name', 'handle', 'mentions', 'views', 'desc', 'category', 'value', 'join_key'])
+        return pd.DataFrame(columns=['name', 'handle', 'mentions', 'views', 'desc', 'category', 'value', 'join_key', 'mindshare'])
 
 # 2. 렌더링 함수
 def render_project_page(conn, follower_df_raw):
     # ---------------------------------------------------------
-    # [CSS] 스타일링
+    # [CSS] 스타일링 (비고 줄바꿈 포함)
     # ---------------------------------------------------------
     st.markdown("""
     <style>
@@ -80,6 +93,16 @@ def render_project_page(conn, follower_df_raw):
     div[role="radiogroup"] label:has(input:checked) { background-color: #004A77 !important; border-color: #004A77 !important; }
     div[role="radiogroup"] label:has(input:checked) p { color: #FFFFFF !important; font-weight: 700 !important; }
     div[role="radiogroup"] label:hover { border-color: #004A77; background-color: #252830; cursor: pointer; }
+    
+    /* [수정] 비고(Note) 텍스트가 잘리지 않고 줄바꿈되도록 수정 */
+    .rank-interest {
+        white-space: normal !important; /* 줄바꿈 허용 */
+        overflow: visible !important;   /* 내용 다 보여줌 */
+        text-overflow: clip !important; /* ... 제거 */
+        display: block !important;
+        line-height: 1.4 !important;
+        margin-top: 4px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -93,41 +116,29 @@ def render_project_page(conn, follower_df_raw):
         return
 
     # ---------------------------------------------------------
-    # [수정됨] 팔로워 데이터 병합 (버그 수정 완료)
+    # 팔로워 데이터 병합
     # ---------------------------------------------------------
     df['real_name'] = df['handle'] 
     df['followers'] = 0 
 
     if not follower_df_raw.empty:
         f_df = follower_df_raw.copy()
-        
-        # 숫자 변환
         f_df['followers'] = pd.to_numeric(f_df['followers'], errors='coerce').fillna(0)
-        
-        # 매칭 키 생성
         f_df['join_key'] = f_df['handle'].astype(str).str.replace('@', '').str.strip().str.lower()
-        
-        # 중복 제거
         f_df = f_df.sort_values('followers', ascending=False).drop_duplicates('join_key')
         
-        # 병합
         merged = pd.merge(
             df, 
             f_df[['join_key', 'name', 'followers']], 
             on='join_key', 
             how='left',
-            suffixes=('', '_map') # 충돌 시 오른쪽 컬럼에 '_map' 붙임
+            suffixes=('', '_map')
         )
         
-        # 이름 업데이트 (name_map 사용)
         df['real_name'] = merged['name_map'].fillna(df['handle'])
-        
-        # [핵심 수정] 팔로워 업데이트 ('followers_map'을 사용해야 함!)
-        # 기존에는 'followers'를 써서 0이 들어간 컬럼을 가져왔었음
         if 'followers_map' in merged.columns:
              df['followers'] = merged['followers_map'].fillna(0)
         else:
-             # 만약 충돌이 안 나서 followers_map이 없다면 그냥 followers 사용
              df['followers'] = merged['followers'].fillna(0)
 
     # ---------------------------------------------------------
@@ -168,20 +179,21 @@ def render_project_page(conn, follower_df_raw):
     col1, col2, col3 = st.columns(3)
     total_acc = len(display_df)
     total_mentions = display_df['mentions'].sum()
+    
     top_one = display_df.loc[display_df['value'].idxmax()]
     top_text = f"{top_one['real_name']} ({top_one['handle']})"
 
     with col1: st.markdown(f'<div class="metric-card"><div class="metric-label">랭킹 계정 수</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
     with col2: st.markdown(f'<div class="metric-card"><div class="metric-label">총 언급 횟수</div><div class="metric-value">{total_mentions:,.0f}</div></div>', unsafe_allow_html=True)
-    with col3: st.markdown(f'<div class="metric-card"><div class="metric-label">1위 계정 (Highest Score)</div><div class="metric-value" style="font-size:18px;">{top_text}</div></div>', unsafe_allow_html=True)
+    with col3: st.markdown(f'<div class="metric-card"><div class="metric-label">1위 계정 (Top Mindshare)</div><div class="metric-value" style="font-size:18px;">{top_text}</div></div>', unsafe_allow_html=True)
     
     st.write("")
 
     # ---------------------------------------------------------
-    # 트리맵 차트
+    # 트리맵 차트 (마인드쉐어 표시)
     # ---------------------------------------------------------
     display_df['chart_label'] = display_df.apply(
-        lambda x: f"{str(x['real_name'])}<br><span style='font-size:0.8em; font-weight:normal;'>{x['value']:.1f} pts</span>", 
+        lambda x: f"{str(x['real_name'])}<br><span style='font-size:0.8em; font-weight:normal;'>{x['mindshare']:.1f}%</span>", 
         axis=1
     )
     
@@ -193,17 +205,17 @@ def render_project_page(conn, follower_df_raw):
         path=path_list, 
         values='value', 
         color='value',
-        custom_data=['real_name', 'handle', 'mentions', 'views', 'followers'],
+        custom_data=['real_name', 'handle', 'mentions', 'views', 'followers', 'mindshare'],
         color_continuous_scale=[(0.00, '#2E2B4E'), (0.05, '#353263'), (0.10, '#3F3C5C'), (0.15, '#464282'), (0.20, '#4A477A'), (0.25, '#4A5D91'), (0.30, '#4A6FA5'), (0.35, '#537CA8'), (0.40, '#5C8BAE'), (0.45, '#5C98AE'), (0.50, '#5E9CA8'), (0.55, '#5E9E94'), (0.60, '#5F9E7F'), (0.65, '#729E6F'), (0.70, '#859E5F'), (0.75, '#969E5F'), (0.80, '#A89E5F'), (0.85, '#AD905D'), (0.90, '#AE815C'), (0.95, '#AE6E5C'), (1.00, '#AE5C5C')],
         template="plotly_dark"
     )
     
     fig.update_traces(
-        texttemplate='<b>%{customdata[0]}</b><br><b style="font-size:1.4em">%{value:.1f}</b>',
+        texttemplate='<b>%{customdata[0]}</b><br><b style="font-size:1.4em">%{customdata[5]:.1f}%</b>',
         textfont=dict(size=20, family="sans-serif", color="white"),
         textposition="middle center",
         marker=dict(line=dict(width=3, color='#000000')), 
-        hovertemplate='<b>%{customdata[0]}</b> (%{customdata[1]})<br>Score: %{value:.1f}<br>Followers: %{customdata[4]:,.0f}<extra></extra>'
+        hovertemplate='<b>%{customdata[0]}</b> (%{customdata[1]})<br>Mindshare: %{customdata[5]:.1f}%<br>Followers: %{customdata[4]:,.0f}<extra></extra>'
     )
     
     fig.update_layout(
@@ -242,7 +254,11 @@ def render_project_page(conn, follower_df_raw):
         desc_raw = clean_str(row.get('desc', ''))
         desc_safe = html.escape(desc_raw)
         
-        stats_text = f"👥 {int(row['followers']):,} Followers"
+        # [수정] 마인드쉐어 (소수점 1자리)
+        mindshare_text = f"{row['mindshare']:.1f}%"
+        
+        # [수정] 팔로워 수 (오른쪽 끝으로 이동할 데이터)
+        follower_text = f"👥 {int(row['followers']):,}"
 
         list_html += f"""
         <details {'open' if expand_view else ''}>
@@ -252,24 +268,35 @@ def render_project_page(conn, follower_df_raw):
                         <div class="rank-num">{medal}</div>
                         <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
                     </div>
+                    
                     <div class="rank-info">
                         <div class="rank-name">{row['real_name']}</div>
                         <div class="rank-handle" style="font-size:11px; color:#9CA3AF;">{row['handle']}</div>
-                        <div class="rank-handle" style="font-size:11px; color:#6B7280; margin-top:2px;">{stats_text}</div>
+                        <div style="font-size:12px; color:#10B981; font-weight:700; margin-top:2px;">
+                           Mindshare: {mindshare_text}
+                        </div>
                     </div>
-                    <div class="rank-extra">
-                        <span class="rank-interest" style="font-weight:400; color:#D1D5DB !important;">{desc_safe[:30]}{'...' if len(desc_safe)>30 else ''}</span>
+                    
+                    <div class="rank-extra" style="display: block; white-space: normal; height: auto; padding: 4px 0;">
+                        <span class="rank-interest" style="font-weight:400; color:#D1D5DB !important; font-size:13px; line-height:1.4;">
+                            {desc_safe}
+                        </span>
                     </div>
-                    <div class="rank-stats-group" style="width: 120px;">
-                        <div class="rank-followers" style="width:100%; color:#10B981; font-size:16px;">{row['value']:.1f} pts</div>
+                    
+                    <div class="rank-stats-group" style="width: 140px; justify-content: flex-end;">
+                        <div class="rank-followers" style="width:100%; color:#E5E7EB; font-size:14px; text-align:right;">
+                            {follower_text}
+                        </div>
                     </div>
                 </div>
             </summary>
+            
             <div class="bio-box">
                 <div class="bio-header">📝 NOTE</div>
                 <div class="bio-content">{desc_safe if desc_safe else "비고 없음"}</div>
                 <div style="margin-top:10px; font-size:12px; color:#6B7280;">
                     • Followers: {int(row['followers']):,}<br>
+                    • Mindshare Score: {row['mindshare']:.2f}%
                 </div>
                 <a href="https://twitter.com/{clean_id}" target="_blank" class="bio-link-btn">
                     Visit Profile ↗
