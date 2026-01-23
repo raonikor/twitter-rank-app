@@ -4,47 +4,39 @@ import plotly.express as px
 import numpy as np
 import html
 
-# 1. 프로젝트 데이터 가져오기 및 포인트 계산
+# 1. 프로젝트 데이터 가져오기
 def get_project_data(conn): 
     try:
-        # 워크시트 이름: 'projects'
-        df = conn.read(worksheet="projects", ttl="30m") 
+        df = conn.read(worksheet="projects", ttl="0") 
         
         if df is not None and not df.empty:
-            # ---------------------------------------------------------
-            # [1] 컬럼 매핑 (한글/영어 호환)
-            # ---------------------------------------------------------
-            # 예상 컬럼: 계정(account), 언급횟수(mentions), 총조회수(views), 비고(note), 포인트(point), 카테고리(category)
+            # 컬럼 매핑 (엑셀 헤더 -> 코드 변수)
             col_map = {
-                '계정': 'name', 'account': 'name',
-                '언급횟수': 'mentions', 'mention_count': 'mentions',
-                '총조회수': 'views', 'total_views': 'views',
-                '비고': 'desc', 'note': 'desc',
-                '포인트': 'score', 'point': 'score',
-                '카테고리': 'category', 'category': 'category'
+                '카테고리 (Category)': 'category', '계정 (Account)': 'name',
+                '언급횟수 (Mentions)': 'mentions', '총조회수 (Views)': 'views',
+                '비고 (Note)': 'desc',
+                '카테고리': 'category', '계정': 'name', 
+                '언급횟수': 'mentions', '총조회수': 'views', '비고': 'desc'
             }
             df = df.rename(columns=col_map)
             
-            # ---------------------------------------------------------
-            # [2] 데이터 전처리 (숫자 변환)
-            # ---------------------------------------------------------
-            # 숫자형 컬럼 변환 (콤마 제거)
-            for col in ['mentions', 'views', 'score']:
+            # 숫자 변환
+            for col in ['mentions', 'views']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(
                         df[col].astype(str).str.replace(',', ''), errors='coerce'
                     ).fillna(0)
                 else:
-                    df[col] = 0 # 컬럼 없으면 0으로 초기화
+                    df[col] = 0 
 
-            # 텍스트 컬럼 처리
+            # 텍스트 처리
             if 'name' not in df.columns: df['name'] = "Unknown"
             df['name'] = df['name'].fillna("Unknown").astype(str).str.strip()
             
-            # 트위터 핸들(@) 추출 (이름 컬럼에 같이 있거나, 핸들이라고 가정)
-            # 여기서는 편의상 'name'을 핸들로 간주하고 처리
-            df['handle'] = df['name'].apply(lambda x: x if x.startswith('@') else f"@{x}")
-            df['clean_name'] = df['name'].str.replace('@', '') # 표시용 이름
+            # 핸들 처리 (@ 붙이기 및 정리)
+            df['handle'] = df['name'].apply(lambda x: x if str(x).startswith('@') else f"@{x}")
+            # 병합을 위한 순수 ID (소문자, @제거)
+            df['join_key'] = df['name'].astype(str).str.replace('@', '').str.strip().str.lower()
 
             if 'desc' not in df.columns: df['desc'] = ""
             df['desc'] = df['desc'].fillna("")
@@ -52,36 +44,24 @@ def get_project_data(conn):
             if 'category' not in df.columns: df['category'] = "전체"
             df['category'] = df['category'].fillna("전체")
 
-            # ---------------------------------------------------------
-            # [3] 포인트(점수) 계산 로직
-            # 공식: (언급횟수 / MAX(언급)) * 40 + (총조회수 / MAX(조회수)) * 60
-            # ---------------------------------------------------------
+            # 포인트 계산
             max_mentions = df['mentions'].max()
             max_views = df['views'].max()
-            
-            # 분모가 0일 경우 대비
             if max_mentions == 0: max_mentions = 1
             if max_views == 0: max_views = 1
             
-            # 계산 (기존 포인트 컬럼이 있어도, 수식 기준으로 재계산하여 정확도 보장)
             df['calculated_score'] = (
                 (df['mentions'] / max_mentions) * 40 + 
                 (df['views'] / max_views) * 60
             )
-            
-            # 최종 'value'는 계산된 점수 사용
-            df['value'] = df['calculated_score'].round(1) # 소수점 1자리
+            df['value'] = df['calculated_score'].round(1)
             
         return df
     except Exception as e:
-        # 에러 시 빈 프레임 반환
-        return pd.DataFrame(columns=['name', 'handle', 'mentions', 'views', 'desc', 'category', 'value'])
+        return pd.DataFrame(columns=['name', 'handle', 'mentions', 'views', 'desc', 'category', 'value', 'join_key'])
 
-# 2. 렌더링 함수
-def render_project_page(conn):
-    # ---------------------------------------------------------
-    # [CSS] 스타일링 (팔로워 맵과 동일)
-    # ---------------------------------------------------------
+# 2. 렌더링 함수 (follower_df 인자 추가됨)
+def render_project_page(conn, follower_df):
     st.markdown("""
     <style>
     div[role="radiogroup"] { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; }
@@ -100,11 +80,36 @@ def render_project_page(conn):
 
     st.title("🧩 크립토 플젝맵 (Crypto Projects)")
     
+    # 1. 프로젝트 데이터 로드
     df = get_project_data(conn)
     
-    if df.empty:
-        st.info("데이터를 불러올 수 없습니다. 'projects' 시트의 컬럼명(계정, 언급횟수, 총조회수, 비고)을 확인해주세요.")
+    if df.empty or 'value' not in df.columns:
+        st.info("데이터를 불러올 수 없습니다. 구글 시트를 확인해주세요.")
         return
+
+    # ---------------------------------------------------------
+    # [핵심] 팔로워 데이터와 병합 (Merge)
+    # ---------------------------------------------------------
+    # 기본값 설정
+    df['real_name'] = df['handle'] # 기본 이름은 핸들로
+    df['followers'] = 0
+
+    if not follower_df.empty:
+        # 병합 준비 (follower_df에서도 키 생성)
+        follower_df['join_key'] = follower_df['handle'].astype(str).str.replace('@', '').str.strip().str.lower()
+        
+        # 'join_key' 기준으로 병합 (name -> real_name, followers -> followers)
+        merged = pd.merge(
+            df, 
+            follower_df[['join_key', 'name', 'followers']], 
+            on='join_key', 
+            how='left',
+            suffixes=('', '_map')
+        )
+        
+        # 병합된 데이터로 컬럼 업데이트 (매칭된 경우 팔로워맵 이름 사용, 없으면 기존 핸들 유지)
+        df['real_name'] = merged['name_map'].fillna(df['handle']) 
+        df['followers'] = merged['followers'].fillna(0)
 
     # ---------------------------------------------------------
     # [UI] 카테고리 선택
@@ -112,22 +117,15 @@ def render_project_page(conn):
     all_cats = ["전체보기"] + sorted(df['category'].unique().tolist())
 
     col_cat, col_opt = st.columns([0.8, 0.2])
-    
     with col_cat:
         st.write("카테고리 선택") 
         selected_category = st.radio(
-            "카테고리 선택", 
-            all_cats, 
-            horizontal=True, 
-            label_visibility="collapsed",
-            key="project_category_main"
+            "카테고리 선택", all_cats, horizontal=True, label_visibility="collapsed", key="project_category_main"
         )
-        
     with col_opt:
         merge_categories = False
         if selected_category == "전체보기":
-            st.write("") 
-            st.write("") 
+            st.write(""); st.write("") 
             merge_categories = st.toggle("통합 보기", value=False, key="project_merge_toggle")
 
     st.caption(f"Crypto Project Rank - {selected_category}")
@@ -146,17 +144,18 @@ def render_project_page(conn):
         return
 
     # ---------------------------------------------------------
-    # 상단 요약 지표
+    # 상단 요약
     # ---------------------------------------------------------
     col1, col2, col3 = st.columns(3)
     total_acc = len(display_df)
     total_mentions = display_df['mentions'].sum()
-    top_one = display_df.loc[display_df['value'].idxmax()] if not display_df.empty else None
-    top_name = f"{top_one['handle']}" if top_one is not None else "-"
+    top_one = display_df.loc[display_df['value'].idxmax()]
+    # 1위 표시: 실제 이름 (핸들)
+    top_text = f"{top_one['real_name']} ({top_one['handle']})"
 
     with col1: st.markdown(f'<div class="metric-card"><div class="metric-label">랭킹 계정 수</div><div class="metric-value">{total_acc}</div></div>', unsafe_allow_html=True)
     with col2: st.markdown(f'<div class="metric-card"><div class="metric-label">총 언급 횟수</div><div class="metric-value">{total_mentions:,.0f}</div></div>', unsafe_allow_html=True)
-    with col3: st.markdown(f'<div class="metric-card"><div class="metric-label">1위 계정 (Highest Score)</div><div class="metric-value" style="font-size:20px;">{top_name}</div></div>', unsafe_allow_html=True)
+    with col3: st.markdown(f'<div class="metric-card"><div class="metric-label">1위 계정 (Highest Score)</div><div class="metric-value" style="font-size:18px;">{top_text}</div></div>', unsafe_allow_html=True)
     
     st.write("")
 
@@ -164,22 +163,19 @@ def render_project_page(conn):
     # 트리맵 차트
     # ---------------------------------------------------------
     display_df['chart_label'] = display_df.apply(
-        lambda x: f"{str(x['handle'])}<br><span style='font-size:0.8em; font-weight:normal;'>{x['value']:.1f} pts</span>", 
+        lambda x: f"{str(x['real_name'])}<br><span style='font-size:0.8em; font-weight:normal;'>{x['value']:.1f} pts</span>", 
         axis=1
     )
     
-    if merge_categories:
-        display_df['root_group'] = "전체 (All)"
-        path_list = ['root_group', 'chart_label']
-    else:
-        path_list = ['category', 'chart_label']
+    path_list = ['root_group', 'chart_label'] if merge_categories else ['category', 'chart_label']
+    if merge_categories: display_df['root_group'] = "전체 (All)"
 
     fig = px.treemap(
         display_df, 
         path=path_list, 
         values='value', 
         color='value',
-        custom_data=['handle', 'mentions', 'views', 'desc'], 
+        custom_data=['real_name', 'handle', 'mentions', 'views', 'followers'], # 팔로워 추가
         color_continuous_scale=[(0.00, '#2E2B4E'), (0.05, '#353263'), (0.10, '#3F3C5C'), (0.15, '#464282'), (0.20, '#4A477A'), (0.25, '#4A5D91'), (0.30, '#4A6FA5'), (0.35, '#537CA8'), (0.40, '#5C8BAE'), (0.45, '#5C98AE'), (0.50, '#5E9CA8'), (0.55, '#5E9E94'), (0.60, '#5F9E7F'), (0.65, '#729E6F'), (0.70, '#859E5F'), (0.75, '#969E5F'), (0.80, '#A89E5F'), (0.85, '#AD905D'), (0.90, '#AE815C'), (0.95, '#AE6E5C'), (1.00, '#AE5C5C')],
         template="plotly_dark"
     )
@@ -189,8 +185,8 @@ def render_project_page(conn):
         textfont=dict(size=20, family="sans-serif", color="white"),
         textposition="middle center",
         marker=dict(line=dict(width=3, color='#000000')), 
-        root_color="#000000",
-        hovertemplate='<b>%{customdata[0]}</b><br>Score: %{value:.1f}<br>Mentions: %{customdata[1]:,.0f}<br>Views: %{customdata[2]:,.0f}<extra></extra>'
+        # 호버에 팔로워 수 표시 추가
+        hovertemplate='<b>%{customdata[0]}</b> (%{customdata[1]})<br>Score: %{value:.1f}<br>Followers: %{customdata[4]:,.0f}<br>Mentions: %{customdata[2]:,.0f}<br>Views: %{customdata[3]:,.0f}<extra></extra>'
     )
     
     fig.update_layout(
@@ -204,15 +200,12 @@ def render_project_page(conn):
     st.write("")
     
     # ---------------------------------------------------------
-    # 리스트 뷰 (랭킹)
+    # 리스트 뷰
     # ---------------------------------------------------------
     col_head, col_toggle = st.columns([1, 0.3])
-    with col_head:
-        st.subheader("📋 계정 랭킹 (Account Ranking)")
-    with col_toggle:
-        expand_view = st.toggle("전체 펼치기", value=False, key="project_list_toggle")
+    with col_head: st.subheader("📋 계정 랭킹 (Account Ranking)")
+    with col_toggle: expand_view = st.toggle("전체 펼치기", value=False, key="project_list_toggle")
     
-    # 점수 높은 순 정렬
     ranking_df = display_df.sort_values(by='value', ascending=False).reset_index(drop=True)
     
     def clean_str(val):
@@ -226,15 +219,15 @@ def render_project_page(conn):
         rank = index + 1
         medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
         
-        # 프로필 이미지 (unavatar 사용)
-        img_url = f"https://unavatar.io/twitter/{row['clean_name']}"
+        # 순수 아이디(@제거)로 이미지 찾기
+        clean_id = str(row['handle']).replace('@', '')
+        img_url = f"https://unavatar.io/twitter/{clean_id}"
         
-        # 상세 내용 (비고)
         desc_raw = clean_str(row.get('desc', ''))
         desc_safe = html.escape(desc_raw)
         
-        # 통계 텍스트
-        stats_text = f"🗣️ {int(row['mentions']):,} | 👁️ {int(row['views']):,}"
+        # 통계 텍스트 (팔로워 수 추가됨)
+        stats_text = f"👥 {int(row['followers']):,} | 🗣️ {int(row['mentions']):,} | 👁️ {int(row['views']):,}"
 
         list_html += f"""
         <details {'open' if expand_view else ''}>
@@ -245,8 +238,9 @@ def render_project_page(conn):
                         <img src="{img_url}" class="rank-img" onerror="this.style.display='none'">
                     </div>
                     <div class="rank-info">
-                        <div class="rank-name">{row['handle']}</div>
-                        <div class="rank-handle" style="font-size:11px; color:#6B7280;">{stats_text}</div>
+                        <div class="rank-name">{row['real_name']}</div>
+                        <div class="rank-handle" style="font-size:11px; color:#9CA3AF;">{row['handle']}</div>
+                        <div class="rank-handle" style="font-size:11px; color:#6B7280; margin-top:2px;">{stats_text}</div>
                     </div>
                     <div class="rank-extra">
                         <span class="rank-interest" style="font-weight:400; color:#D1D5DB !important;">{desc_safe[:30]}{'...' if len(desc_safe)>30 else ''}</span>
@@ -260,10 +254,11 @@ def render_project_page(conn):
                 <div class="bio-header">📝 NOTE</div>
                 <div class="bio-content">{desc_safe if desc_safe else "비고 없음"}</div>
                 <div style="margin-top:10px; font-size:12px; color:#6B7280;">
+                    • Followers: {int(row['followers']):,}<br>
                     • Mention Count: {int(row['mentions']):,}<br>
                     • Total Views: {int(row['views']):,}
                 </div>
-                <a href="https://twitter.com/{row['clean_name']}" target="_blank" class="bio-link-btn">
+                <a href="https://twitter.com/{clean_id}" target="_blank" class="bio-link-btn">
                     Visit Profile ↗
                 </a>
             </div>
