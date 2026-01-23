@@ -7,11 +7,9 @@ import html
 # 1. 프로젝트 데이터 가져오기 및 포인트 계산
 def get_project_data(conn): 
     try:
-        # 캐시 없이 즉시 불러오기
         df = conn.read(worksheet="projects", ttl="0") 
         
         if df is not None and not df.empty:
-            # 컬럼 매핑
             col_map = {
                 '카테고리 (Category)': 'category', '계정 (Account)': 'name',
                 '언급횟수 (Mentions)': 'mentions', '총조회수 (Views)': 'views',
@@ -21,7 +19,6 @@ def get_project_data(conn):
             }
             df = df.rename(columns=col_map)
             
-            # 숫자형 변환
             for col in ['mentions', 'views']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(
@@ -30,14 +27,10 @@ def get_project_data(conn):
                 else:
                     df[col] = 0 
 
-            # 이름/핸들 처리
             if 'name' not in df.columns: df['name'] = "Unknown"
             df['name'] = df['name'].fillna("Unknown").astype(str).str.strip()
             
-            # 표준 핸들 포맷 (@붙이기)
             df['handle'] = df['name'].apply(lambda x: x if str(x).startswith('@') else f"@{x}")
-            
-            # [매칭 키] 소문자, 공백제거, @제거
             df['join_key'] = df['handle'].astype(str).str.replace('@', '').str.strip().str.lower()
 
             if 'desc' not in df.columns: df['desc'] = ""
@@ -46,28 +39,21 @@ def get_project_data(conn):
             if 'category' not in df.columns: df['category'] = "전체"
             df['category'] = df['category'].fillna("전체")
 
-            # ---------------------------------------------------------
-            # 포인트(점수) 및 마인드쉐어 계산
-            # ---------------------------------------------------------
             max_mentions = df['mentions'].max()
             max_views = df['views'].max()
             
             if max_mentions == 0: max_mentions = 1
             if max_views == 0: max_views = 1
             
-            # 기본 점수 산출
             df['raw_score'] = (
                 (df['mentions'] / max_mentions) * 40 + 
                 (df['views'] / max_views) * 60
             )
             
-            # 마인드쉐어(%) 계산
             total_score = df['raw_score'].sum()
             if total_score == 0: total_score = 1
             
             df['mindshare'] = (df['raw_score'] / total_score) * 100
-            
-            # 트리맵 크기용
             df['value'] = df['raw_score']
             
         return df
@@ -76,9 +62,6 @@ def get_project_data(conn):
 
 # 2. 렌더링 함수
 def render_project_page(conn, follower_df_raw):
-    # ---------------------------------------------------------
-    # [CSS] 스타일링 (비고 줄바꿈 포함)
-    # ---------------------------------------------------------
     st.markdown("""
     <style>
     div[role="radiogroup"] { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; }
@@ -93,7 +76,6 @@ def render_project_page(conn, follower_df_raw):
     div[role="radiogroup"] label:has(input:checked) p { color: #FFFFFF !important; font-weight: 700 !important; }
     div[role="radiogroup"] label:hover { border-color: #004A77; background-color: #252830; cursor: pointer; }
     
-    /* 비고 텍스트 줄바꿈 */
     .rank-interest {
         white-space: normal !important;
         overflow: visible !important;
@@ -107,16 +89,13 @@ def render_project_page(conn, follower_df_raw):
 
     st.title("🧩 크립토 플젝맵 (Crypto Projects)")
     
-    # 1. 프로젝트 데이터 로드
     df = get_project_data(conn)
     
     if df.empty or 'value' not in df.columns:
         st.info("데이터를 불러올 수 없습니다. 'projects' 시트를 확인해주세요.")
         return
 
-    # ---------------------------------------------------------
     # 팔로워 데이터 병합
-    # ---------------------------------------------------------
     df['real_name'] = df['handle'] 
     df['followers'] = 0 
 
@@ -140,9 +119,7 @@ def render_project_page(conn, follower_df_raw):
         else:
              df['followers'] = merged['followers'].fillna(0)
 
-    # ---------------------------------------------------------
-    # [UI] 카테고리 선택
-    # ---------------------------------------------------------
+    # UI 및 필터링
     all_cats = ["전체보기"] + sorted(df['category'].unique().tolist())
 
     col_cat, col_opt = st.columns([0.8, 0.2])
@@ -160,9 +137,6 @@ def render_project_page(conn, follower_df_raw):
     st.caption(f"Crypto Project Rank - {selected_category}")
     st.write("") 
 
-    # ---------------------------------------------------------
-    # 데이터 필터링
-    # ---------------------------------------------------------
     if selected_category == "전체보기":
         display_df = df[df['value'] > 0]
     else:
@@ -172,13 +146,10 @@ def render_project_page(conn, follower_df_raw):
         st.info(f"'{selected_category}' 데이터가 없습니다.")
         return
 
-    # ---------------------------------------------------------
     # 상단 요약
-    # ---------------------------------------------------------
     col1, col2, col3 = st.columns(3)
     total_acc = len(display_df)
     total_mentions = display_df['mentions'].sum()
-    
     top_one = display_df.loc[display_df['value'].idxmax()]
     top_text = f"{top_one['real_name']} ({top_one['handle']})"
 
@@ -188,9 +159,7 @@ def render_project_page(conn, follower_df_raw):
     
     st.write("")
 
-    # ---------------------------------------------------------
-    # 트리맵 차트 (마인드쉐어 표시)
-    # ---------------------------------------------------------
+    # 트리맵 차트
     display_df['chart_label'] = display_df.apply(
         lambda x: f"{str(x['real_name'])}<br><span style='font-size:0.8em; font-weight:normal;'>{x['mindshare']:.1f}%</span>", 
         axis=1
@@ -227,9 +196,7 @@ def render_project_page(conn, follower_df_raw):
 
     st.write("")
     
-    # ---------------------------------------------------------
-    # 리스트 뷰 (HTML 구조 단순화)
-    # ---------------------------------------------------------
+    # 리스트 뷰
     col_head, col_toggle = st.columns([1, 0.3])
     with col_head: st.subheader("📋 계정 랭킹 (Account Ranking)")
     with col_toggle: expand_view = st.toggle("전체 펼치기", value=False, key="project_list_toggle")
@@ -253,18 +220,20 @@ def render_project_page(conn, follower_df_raw):
         desc_raw = clean_str(row.get('desc', ''))
         desc_safe = html.escape(desc_raw)
         
-        mindshare_text = f"{row['mindshare']:.1f}%"
+        mindshare_text = f"Mindshare: {row['mindshare']:.1f}%"
         follower_text = f"👥 {int(row['followers']):,}"
 
-        # [수정됨] 들여쓰기 문제를 방지하기 위해 한 줄로 연결하거나 들여쓰기 제거
         list_html += f'''
 <details {'open' if expand_view else ''}>
 <summary>
 <div class="ranking-row">
 <div class="rank-col-1"><div class="rank-num">{medal}</div><img src="{img_url}" class="rank-img" onerror="this.style.display='none'"></div>
-<div class="rank-info"><div class="rank-name">{row['real_name']}</div><div class="rank-handle" style="font-size:11px; color:#9CA3AF;">{row['handle']}</div><div style="font-size:12px; color:#10B981; font-weight:700; margin-top:2px;">Mindshare: {mindshare_text}</div></div>
+<div class="rank-info"><div class="rank-name">{row['real_name']}</div><div class="rank-handle" style="font-size:11px; color:#9CA3AF;">{row['handle']}</div></div>
 <div class="rank-extra" style="display: block; white-space: normal; height: auto; padding: 4px 0;"><span class="rank-interest" style="font-weight:400; color:#D1D5DB !important; font-size:13px; line-height:1.4;">{desc_safe}</span></div>
-<div class="rank-stats-group" style="width: 140px; justify-content: flex-end;"><div class="rank-followers" style="width:100%; color:#E5E7EB; font-size:14px; text-align:right;">{follower_text}</div></div>
+<div class="rank-stats-group" style="width: 160px; flex-direction: column; justify-content: center; align-items: flex-end; gap: 2px;">
+<div style="color:#E5E7EB; font-size:14px; font-weight:600;">{follower_text}</div>
+<div style="color:#10B981; font-size:12px; font-weight:700;">{mindshare_text}</div>
+</div>
 </div>
 </summary>
 <div class="bio-box">
