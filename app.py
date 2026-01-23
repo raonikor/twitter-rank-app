@@ -279,7 +279,7 @@ st.markdown(f"""
 # ---------------------------------------------------------
 # 배너 설정 (폴더명/파일이름, 링크주소)
 banner_img_path = "images/banner.png"  
-banner_link = "https://t.me/Raoni1"   
+banner_link = "https://t.me/Raoni1/17221"   
 
 # 배너 렌더링 (파일이 있을 때만 표시)
 if os.path.exists(banner_img_path):
@@ -344,3 +344,4 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
+
