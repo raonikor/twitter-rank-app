@@ -13,6 +13,7 @@ import event_logic
 import twitter_logic
 import payout_logic
 import follower_logic
+import project_logic # [NEW] 프로젝트 맵 모듈 추가
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
@@ -46,7 +47,7 @@ st.markdown("""
     .ticker-wrapper {
         display: inline-block;
         padding-left: 100%;
-        /* [수정] 속도 조절: 120s (숫자가 클수록 느려짐) */
+        /* 속도 조절: 2500s */
         animation: ticker 2500s linear infinite; 
     }
     
@@ -74,7 +75,7 @@ st.markdown("""
         100% { transform: translate3d(-100%, 0, 0); }
     }
 
-    /* 메인 컨텐츠 상단 여백 확보 (티커에 가려지지 않게) */
+    /* 메인 컨텐츠 상단 여백 확보 */
     .main .block-container {
         padding-top: 80px !important;
     }
@@ -214,7 +215,7 @@ with st.sidebar:
         </a>
     """, unsafe_allow_html=True)
 
-menu_options = ["트위터 팔로워 맵", "트위터 주급 맵", "실시간 트위터", "지수 비교 (Indices)", "텔레그램 이벤트"]
+menu_options = ["트위터 팔로워 맵", "크립토 플젝맵", "트위터 주급 맵", "실시간 트위터", "지수 비교 (Indices)", "텔레그램 이벤트"]
 if is_admin: menu_options.append("관리자 페이지") 
 
 with menu_placeholder.container():
@@ -265,14 +266,20 @@ st.markdown(f"""
 # [PAGE 1] 트위터 팔로워 맵
 # ==========================================
 if menu == "트위터 팔로워 맵":
-    # 이미 로드된 df 전달
+    if 'df' not in locals() or df.empty: df = get_sheet_data()
     follower_logic.render_follower_page(conn, df)
+
+# ==========================================
+# [PAGE 1.5] 크립토 플젝맵 (NEW)
+# ==========================================
+elif menu == "크립토 플젝맵":
+    project_logic.render_project_page(conn)
 
 # ==========================================
 # [PAGE 2] 트위터 주급 맵
 # ==========================================
 elif menu == "트위터 주급 맵":
-    # 이미 로드된 df 전달
+    if 'df' not in locals() or df.empty: df = get_sheet_data()
     payout_logic.render_payout_page(conn, df)
 
 # ==========================================
@@ -296,7 +303,3 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
-
-
-
-
