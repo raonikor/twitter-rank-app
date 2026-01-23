@@ -11,9 +11,7 @@ def get_project_data(conn):
         df = conn.read(worksheet="projects", ttl="0") 
         
         if df is not None and not df.empty:
-            # ---------------------------------------------------------
-            # [1] 컬럼 매핑 (유연하게 처리)
-            # ---------------------------------------------------------
+            # 컬럼 매핑
             col_map = {
                 '카테고리 (Category)': 'category', '계정 (Account)': 'name',
                 '언급횟수 (Mentions)': 'mentions', '총조회수 (Views)': 'views',
@@ -23,10 +21,7 @@ def get_project_data(conn):
             }
             df = df.rename(columns=col_map)
             
-            # ---------------------------------------------------------
-            # [2] 데이터 전처리
-            # ---------------------------------------------------------
-            # 숫자형 컬럼 변환
+            # 숫자형 변환 (계산용)
             for col in ['mentions', 'views']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(
@@ -35,14 +30,14 @@ def get_project_data(conn):
                 else:
                     df[col] = 0 
 
-            # 이름(핸들) 처리
+            # 이름/핸들 처리
             if 'name' not in df.columns: df['name'] = "Unknown"
             df['name'] = df['name'].fillna("Unknown").astype(str).str.strip()
             
-            # @가 없으면 붙여서 표준 핸들 포맷 생성
+            # 표준 핸들 포맷 (@붙이기)
             df['handle'] = df['name'].apply(lambda x: x if str(x).startswith('@') else f"@{x}")
             
-            # [핵심] 병합을 위한 'join_key' 생성 (소문자, @제거, 공백제거)
+            # [매칭 키 생성] 소문자 변환, 공백 제거, @ 제거 -> 매칭 성공률 높임
             df['join_key'] = df['handle'].astype(str).str.replace('@', '').str.strip().str.lower()
 
             if 'desc' not in df.columns: df['desc'] = ""
@@ -52,7 +47,7 @@ def get_project_data(conn):
             df['category'] = df['category'].fillna("전체")
 
             # ---------------------------------------------------------
-            # [3] 포인트(점수) 계산
+            # 포인트(점수) 계산 (랭킹 산정용)
             # ---------------------------------------------------------
             max_mentions = df['mentions'].max()
             max_views = df['views'].max()
@@ -96,45 +91,40 @@ def render_project_page(conn, follower_df_raw):
     # 1. 프로젝트 데이터 로드
     df = get_project_data(conn)
     
-    # 데이터 유효성 검사
     if df.empty or 'value' not in df.columns:
         st.info("데이터를 불러올 수 없습니다. 'projects' 시트를 확인해주세요.")
         return
 
     # ---------------------------------------------------------
-    # [핵심] 팔로워 데이터 병합 로직 강화
+    # [수정됨] 팔로워 데이터 병합 로직 (매칭 강화)
     # ---------------------------------------------------------
-    # 기본값 설정 (매칭 실패 시 사용할 값)
     df['real_name'] = df['handle'] 
-    df['followers'] = 0
+    df['followers'] = 0 # 초기화
 
     if not follower_df_raw.empty:
-        # 원본 데이터 보호를 위해 복사본 사용
-        follower_df = follower_df_raw.copy()
+        # 복사본 생성
+        f_df = follower_df_raw.copy()
         
-        # 팔로워 수 숫자 변환 (안전장치)
-        follower_df['followers'] = pd.to_numeric(follower_df['followers'], errors='coerce').fillna(0)
+        # 팔로워 수 숫자 변환
+        f_df['followers'] = pd.to_numeric(f_df['followers'], errors='coerce').fillna(0)
         
-        # join_key 생성 (프로젝트 데이터와 동일한 방식)
-        follower_df['join_key'] = follower_df['handle'].astype(str).str.replace('@', '').str.strip().str.lower()
+        # [매칭 키 생성] 프로젝트 데이터와 동일한 규칙 적용 (@제거, 소문자, 공백제거)
+        f_df['join_key'] = f_df['handle'].astype(str).str.replace('@', '').str.strip().str.lower()
         
-        # [중요] 중복된 핸들이 있을 경우 팔로워 수가 많은 것 하나만 남김 (오류 방지)
-        follower_df = follower_df.sort_values('followers', ascending=False).drop_duplicates('join_key')
+        # 중복 제거 (같은 핸들이면 팔로워 많은 쪽 유지)
+        f_df = f_df.sort_values('followers', ascending=False).drop_duplicates('join_key')
         
         # 병합 (Left Join)
         merged = pd.merge(
             df, 
-            follower_df[['join_key', 'name', 'followers']], 
+            f_df[['join_key', 'name', 'followers']], 
             on='join_key', 
             how='left',
             suffixes=('', '_map')
         )
         
-        # 데이터 업데이트 (매칭된 데이터가 있으면 덮어쓰기)
-        # 1. 이름: 팔로워맵의 표시 이름(name_map) 사용, 없으면 기존 핸들
+        # 데이터 업데이트
         df['real_name'] = merged['name_map'].fillna(df['handle'])
-        
-        # 2. 팔로워: 매칭된 팔로워 수 사용, 없으면 0
         df['followers'] = merged['followers'].fillna(0)
 
     # ---------------------------------------------------------
@@ -170,13 +160,12 @@ def render_project_page(conn, follower_df_raw):
         return
 
     # ---------------------------------------------------------
-    # 상단 요약
+    # 상단 요약 (조회수/언급횟수는 유지 - 전체 통계용)
     # ---------------------------------------------------------
     col1, col2, col3 = st.columns(3)
     total_acc = len(display_df)
     total_mentions = display_df['mentions'].sum()
     
-    # 1위 계정 찾기
     top_one = display_df.loc[display_df['value'].idxmax()]
     top_text = f"{top_one['real_name']} ({top_one['handle']})"
 
@@ -212,7 +201,8 @@ def render_project_page(conn, follower_df_raw):
         textfont=dict(size=20, family="sans-serif", color="white"),
         textposition="middle center",
         marker=dict(line=dict(width=3, color='#000000')), 
-        hovertemplate='<b>%{customdata[0]}</b> (%{customdata[1]})<br>Score: %{value:.1f}<br>Followers: %{customdata[4]:,.0f}<br>Mentions: %{customdata[2]:,.0f}<br>Views: %{customdata[3]:,.0f}<extra></extra>'
+        # 호버 정보
+        hovertemplate='<b>%{customdata[0]}</b> (%{customdata[1]})<br>Score: %{value:.1f}<br>Followers: %{customdata[4]:,.0f}<extra></extra>'
     )
     
     fig.update_layout(
@@ -226,7 +216,7 @@ def render_project_page(conn, follower_df_raw):
     st.write("")
     
     # ---------------------------------------------------------
-    # 리스트 뷰
+    # 리스트 뷰 (언급횟수, 조회수 제거됨)
     # ---------------------------------------------------------
     col_head, col_toggle = st.columns([1, 0.3])
     with col_head: st.subheader("📋 계정 랭킹 (Account Ranking)")
@@ -245,14 +235,15 @@ def render_project_page(conn, follower_df_raw):
         rank = index + 1
         medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}"
         
-        # 프로필 이미지
+        # 이미지 URL
         clean_id = str(row['handle']).replace('@', '')
         img_url = f"https://unavatar.io/twitter/{clean_id}"
         
         desc_raw = clean_str(row.get('desc', ''))
         desc_safe = html.escape(desc_raw)
         
-        stats_text = f"👥 {int(row['followers']):,} | 🗣️ {int(row['mentions']):,} | 👁️ {int(row['views']):,}"
+        # [수정] 통계 텍스트: 팔로워만 표시
+        stats_text = f"👥 {int(row['followers']):,} Followers"
 
         list_html += f"""
         <details {'open' if expand_view else ''}>
@@ -280,9 +271,7 @@ def render_project_page(conn, follower_df_raw):
                 <div class="bio-content">{desc_safe if desc_safe else "비고 없음"}</div>
                 <div style="margin-top:10px; font-size:12px; color:#6B7280;">
                     • Followers: {int(row['followers']):,}<br>
-                    • Mention Count: {int(row['mentions']):,}<br>
-                    • Total Views: {int(row['views']):,}
-                </div>
+                    </div>
                 <a href="https://twitter.com/{clean_id}" target="_blank" class="bio-link-btn">
                     Visit Profile ↗
                 </a>
