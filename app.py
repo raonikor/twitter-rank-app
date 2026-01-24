@@ -46,7 +46,7 @@ st.markdown("""
     /* ------------------------------------------------------- */
     [data-testid="stSidebarCollapsedControl"] {
         position: fixed !important;
-        top: 50px !important;           /* 뉴스 티커(50px) 바로 아래 */
+        top: 150px !important;           /* 뉴스 티커(50px) 바로 아래 */
         left: 0px !important;           /* 왼쪽 벽에 붙임 */
         
         width: 40px !important;         /* 너비 */
@@ -378,3 +378,4 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
+
