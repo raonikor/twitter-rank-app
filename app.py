@@ -17,6 +17,26 @@ import payout_logic
 import follower_logic
 import project_logic 
 
+# ---------------------------------------------------------
+# [기능 추가] 배너 설정 관리 (ON/OFF 저장)
+# ---------------------------------------------------------
+CONFIG_FILE = 'banner_config.txt'
+
+def load_banner_state():
+    """배너 상태 불러오기 (기본값: True/켜짐)"""
+    if not os.path.exists(CONFIG_FILE):
+        return True
+    try:
+        with open(CONFIG_FILE, 'r') as f:
+            return f.read().strip() == 'ON'
+    except:
+        return True
+
+def save_banner_state(is_on):
+    """배너 상태 저장하기"""
+    with open(CONFIG_FILE, 'w') as f:
+        f.write('ON' if is_on else 'OFF')
+
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
 
@@ -227,6 +247,19 @@ with st.sidebar:
     with st.expander("⚙️ 설정 (Admin)", expanded=False):
         admin_pw = st.text_input("Key", type="password")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
+        
+        # [NEW] 관리자일 때만 배너 설정 버튼 노출
+        if is_admin:
+            st.write("")
+            st.markdown("**배너 광고 관리**")
+            current_banner_state = load_banner_state()
+            new_banner_state = st.toggle("배너 광고 노출", value=current_banner_state)
+            
+            # 상태가 변경되면 저장하고 새로고침
+            if new_banner_state != current_banner_state:
+                save_banner_state(new_banner_state)
+                st.rerun()
+
     visitor_logic.display_visitor_widget(total_visitors, today_visitors)
     st.markdown("""
         <a href="https://x.com/raonikor" target="_blank" class="social-box">
@@ -275,21 +308,22 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# [배너 광고] 메인 상단 (티커 아래)
+# [배너 광고] 관리자 설정에 따라 노출 여부 결정
 # ---------------------------------------------------------
-# 배너 설정 (폴더명/파일이름, 링크주소)
-banner_img_path = "images/banner.png"  
-banner_link = "https://t.me/Raoni1/17221"   
+# 1. 설정값 불러오기
+show_banner = load_banner_state()
 
-# 배너 렌더링 (파일이 있을 때만 표시)
-if os.path.exists(banner_img_path):
+# 2. 배너 경로 및 링크
+banner_img_path = "images/banner.png"  
+banner_link = "https://t.me/Raoni1/17221"
+
+# 3. 배너 렌더링 (설정이 켜져있고 파일이 있을 때만)
+if show_banner and os.path.exists(banner_img_path):
     try:
-        # 이미지를 읽어서 Base64 문자열로 변환 (클릭 가능한 HTML용)
         with open(banner_img_path, "rb") as f:
             img_data = f.read()
             b64_img = base64.b64encode(img_data).decode()
         
-        # HTML로 배너 출력 (CSS 애니메이션 포함)
         st.markdown(f"""
             <a href="{banner_link}" target="_blank" style="text-decoration: none;">
                 <div class="banner-box">
@@ -298,7 +332,6 @@ if os.path.exists(banner_img_path):
             </a>
         """, unsafe_allow_html=True)
     except Exception as e:
-        # 에러 발생 시 조용히 넘어감 (배너 안 뜸)
         pass
 
 # ==========================================
@@ -313,7 +346,6 @@ if menu == "트위터 팔로워 맵":
 # ==========================================
 elif menu == "크립토 플젝맵":
     if 'df' not in locals() or df.empty: df = get_sheet_data()
-    # [중요] df(팔로워 데이터)를 함께 넘겨줘야 함
     project_logic.render_project_page(conn, df)
 
 # ==========================================
@@ -344,4 +376,3 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
-
