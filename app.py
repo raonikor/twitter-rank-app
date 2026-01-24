@@ -42,35 +42,43 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
     /* ------------------------------------------------------- */
-    /* [긴급 수정] 사이드바 열기 버튼 (> 화살표) 위치 강제 조정 */
+    /* [위치 변경] 사이드바 열기 버튼 -> 왼쪽 하단 (Bottom-Left) */
     /* ------------------------------------------------------- */
     [data-testid="stSidebarCollapsedControl"] {
         position: fixed !important;
-        top: 60px !important;           /* 티커(50px)보다 더 아래로 내림 */
-        left: 10px !important;          /* 왼쪽 여백 */
-        z-index: 2147483647 !important; /* 지구상 모든 요소보다 위에 표시 (최대값) */
-        background-color: rgba(20, 22, 25, 0.9) !important; /* 배경색 추가 (글자 겹침 방지) */
-        border: 1px solid #333 !important;
-        border-radius: 8px !important;
-        padding: 4px !important;
-        width: 40px !important;
-        height: 40px !important;
+        top: auto !important;           /* 위쪽 위치 해제 */
+        bottom: 30px !important;        /* 화면 아래에서 30px 띄움 */
+        left: 20px !important;          /* 화면 왼쪽에서 20px 띄움 */
+        z-index: 2147483647 !important; /* 최상단 표시 */
+        background-color: #10B981 !important; /* 녹색 배경 (잘 보이게) */
+        border: 2px solid #065F46 !important;
+        border-radius: 50% !important;  /* 동그라미 모양 */
+        padding: 8px !important;
+        width: 50px !important;
+        height: 50px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.5) !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
+        transition: transform 0.2s ease;
     }
     
-    /* 버튼 내부 아이콘 색상 강제 지정 */
+    /* 버튼 내부 아이콘 색상 (흰색) */
     [data-testid="stSidebarCollapsedControl"] svg {
         fill: #FFFFFF !important;
         color: #FFFFFF !important;
+        width: 24px !important;
+        height: 24px !important;
     }
 
-    /* 버튼 호버 효과 */
-    [data-testid="stSidebarCollapsedControl"]:hover {
-        background-color: #10B981 !important;
-        border-color: #10B981 !important;
+    /* 버튼 눌렀을 때 효과 */
+    [data-testid="stSidebarCollapsedControl"]:active {
+        transform: scale(0.9);
+    }
+    
+    /* 데스크탑에서 사이드바가 열려있을 때 닫기 버튼(X)은 원래 위치 유지 */
+    [data-testid="stSidebarExpandedControl"] {
+        z-index: 2147483647 !important; 
     }
 
     /* ------------------------------------------------------- */
