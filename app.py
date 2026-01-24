@@ -63,7 +63,7 @@ st.markdown("""
         
         /* 혹시 몰라 위치도 강제로 다시 잡음 */
         position: fixed !important;
-        top: 60px !important;
+        top: 0px !important;
         left: 10px !important;
         z-index: 1000002 !important;
     }
@@ -372,4 +372,5 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
+
 
