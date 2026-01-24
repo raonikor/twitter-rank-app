@@ -47,7 +47,7 @@ st.markdown("""
     
     /* 1. 스트림릿 기본 헤더를 다시 맨 위(0px)로 올림 */
     header[data-testid="stHeader"] {
-        top: 10px !important;             /* 맨 위로 원복 */
+        top: 20px !important;             /* 맨 위로 원복 */
         background-color: transparent !important; 
         z-index: 1000002 !important;     /* 티커(1000001)보다 위에 배치하여 버튼 클릭 가능하게 함 */
         height: auto !important;
@@ -56,7 +56,7 @@ st.markdown("""
     /* 2. 사이드바 여는 버튼 (화살표 >) 디자인 및 위치 */
     [data-testid="stSidebarCollapsedControl"] {
         position: fixed !important;
-        top: 10px !important;             /* [요청하신 부분] 0px 위치 */
+        top: 20px !important;             /* [요청하신 부분] 0px 위치 */
         left: 0px !important;            /* 왼쪽 벽 */
         z-index: 1000003 !important;     /* 최상단 (헤더보다 위) */
         
@@ -381,3 +381,4 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
+
