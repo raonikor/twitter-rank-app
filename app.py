@@ -18,24 +18,18 @@ import follower_logic
 import project_logic 
 
 # ---------------------------------------------------------
-# [기능 추가] 배너 설정 관리 (ON/OFF 저장)
+# [기능] 배너 설정 관리
 # ---------------------------------------------------------
 CONFIG_FILE = 'banner_config.txt'
 
 def load_banner_state():
-    """배너 상태 불러오기 (기본값: True/켜짐)"""
-    if not os.path.exists(CONFIG_FILE):
-        return True
+    if not os.path.exists(CONFIG_FILE): return True
     try:
-        with open(CONFIG_FILE, 'r') as f:
-            return f.read().strip() == 'ON'
-    except:
-        return True
+        with open(CONFIG_FILE, 'r') as f: return f.read().strip() == 'ON'
+    except: return True
 
 def save_banner_state(is_on):
-    """배너 상태 저장하기"""
-    with open(CONFIG_FILE, 'w') as f:
-        f.write('ON' if is_on else 'OFF')
+    with open(CONFIG_FILE, 'w') as f: f.write('ON' if is_on else 'OFF')
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Raoni Map", layout="wide")
@@ -47,6 +41,25 @@ st.markdown("""
     .stApp { background-color: #0F1115; color: #FFFFFF; }
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
+    /* ------------------------------------------------------- */
+    /* [수정] 사이드바 열기 버튼 위치 조정 (모바일 대응) */
+    /* ------------------------------------------------------- */
+    [data-testid="stSidebarCollapsedControl"] {
+        top: 60px !important;       /* 뉴스 티커 높이(50px)보다 아래로 내림 */
+        left: 10px !important;      /* 왼쪽 여백 */
+        z-index: 1000001 !important; /* 티커(999999)보다 위에 표시 */
+        background-color: rgba(30, 31, 32, 0.8); /* 잘 보이게 반투명 배경 추가 */
+        border-radius: 8px;
+        padding: 4px;
+        transition: all 0.3s ease;
+    }
+    
+    /* 버튼에 마우스 올렸을 때 강조 */
+    [data-testid="stSidebarCollapsedControl"]:hover {
+        background-color: #10B981;
+        color: white;
+    }
+
     /* ------------------------------------------------------- */
     /* [뉴스 티커] 상단 고정 스타일 */
     /* ------------------------------------------------------- */
@@ -69,7 +82,6 @@ st.markdown("""
     .ticker-wrapper {
         display: inline-block;
         padding-left: 100%;
-        /* 속도 조절: 2500s (아주 천천히) */
         animation: ticker 2500s linear infinite; 
     }
     
@@ -123,7 +135,7 @@ st.markdown("""
     }
 
     /* ------------------------------------------------------- */
-    /* 사이드바 스타일 (세로형 알약 버튼) */
+    /* 사이드바 스타일 */
     /* ------------------------------------------------------- */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] { 
         display: flex; flex-direction: column !important; gap: 6px; 
@@ -222,20 +234,15 @@ def get_sheet_data():
         df = conn.read(ttl="0") 
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
-            
-            # 텍스트 컬럼 안전 처리
             cols_to_check = ['handle', 'name', 'category', 'recent_interest', 'note']
             for col in cols_to_check:
                 if col not in df.columns: df[col] = "" 
                 df[col] = df[col].fillna("").astype(str)
-            
             mask = (df['name'] == "") | (df['name'] == "nan")
             df.loc[mask, 'name'] = df.loc[mask, 'handle']
-            
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'recent_interest', 'note'])
 
-# [중요] 앱 시작 시 데이터 로드 (뉴스 티커용)
 df = get_sheet_data()
 
 # 4. 사이드바 구성
@@ -247,15 +254,11 @@ with st.sidebar:
     with st.expander("⚙️ 설정 (Admin)", expanded=False):
         admin_pw = st.text_input("Key", type="password")
         is_admin = (admin_pw == st.secrets["ADMIN_PW"])
-        
-        # [NEW] 관리자일 때만 배너 설정 버튼 노출
         if is_admin:
             st.write("")
             st.markdown("**배너 광고 관리**")
             current_banner_state = load_banner_state()
             new_banner_state = st.toggle("배너 광고 노출", value=current_banner_state)
-            
-            # 상태가 변경되면 저장하고 새로고침
             if new_banner_state != current_banner_state:
                 save_banner_state(new_banner_state)
                 st.rerun()
@@ -310,14 +313,10 @@ st.markdown(f"""
 # ---------------------------------------------------------
 # [배너 광고] 관리자 설정에 따라 노출 여부 결정
 # ---------------------------------------------------------
-# 1. 설정값 불러오기
 show_banner = load_banner_state()
-
-# 2. 배너 경로 및 링크
 banner_img_path = "images/banner.png"  
 banner_link = "https://t.me/Raoni1/17221"
 
-# 3. 배너 렌더링 (설정이 켜져있고 파일이 있을 때만)
 if show_banner and os.path.exists(banner_img_path):
     try:
         with open(banner_img_path, "rb") as f:
@@ -335,44 +334,20 @@ if show_banner and os.path.exists(banner_img_path):
         pass
 
 # ==========================================
-# [PAGE 1] 트위터 팔로워 맵
+# 페이지 렌더링
 # ==========================================
 if menu == "트위터 팔로워 맵":
     if 'df' not in locals() or df.empty: df = get_sheet_data()
     follower_logic.render_follower_page(conn, df)
-
-# ==========================================
-# [PAGE 1.5] 크립토 플젝맵 (NEW)
-# ==========================================
 elif menu == "크립토 플젝맵":
     if 'df' not in locals() or df.empty: df = get_sheet_data()
     project_logic.render_project_page(conn, df)
-
-# ==========================================
-# [PAGE 2] 트위터 주급 맵
-# ==========================================
 elif menu == "트위터 주급 맵":
     if 'df' not in locals() or df.empty: df = get_sheet_data()
     payout_logic.render_payout_page(conn, df)
-
-# ==========================================
-# [PAGE 3] 실시간 트위터
-# ==========================================
 elif menu == "실시간 트위터": twitter_logic.render_twitter_page()
-
-# ==========================================
-# [PAGE 4] 지수 비교 (Indices)
-# ==========================================
 elif menu == "지수 비교 (Indices)": market_logic.render_market_page()
-
-# ==========================================
-# [PAGE 5] 텔레그램 이벤트
-# ==========================================
 elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
-
-# ==========================================
-# [PAGE 6] 관리자 페이지
-# ==========================================
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
