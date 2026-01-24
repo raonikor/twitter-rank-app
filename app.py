@@ -49,7 +49,7 @@ st.markdown("""
     header[data-testid="stHeader"] {
         top: 0px !important;            /* 티커 아래 60px 지점에 배치 */
         background-color: transparent !important; /* 배경 투명하게 (겹침 방지) */
-        z-index: 800 !important;        /* 티커보다는 아래, 콘텐츠보다는 위 */
+        z-index: 100 !important;        /* 티커보다는 아래, 콘텐츠보다는 위 */
         height: auto !important;         /* 높이 자동 */
     }
 
@@ -372,6 +372,7 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
+
 
 
 
