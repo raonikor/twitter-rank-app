@@ -42,43 +42,46 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
     /* ------------------------------------------------------- */
-    /* [핵심 수정] 사이드바 열기 버튼 강제 노출 (모바일/PC 공통) */
+    /* [핵심 수정] 사이드바 열기 버튼 -> 세로로 긴 '책갈피' 스타일 */
     /* ------------------------------------------------------- */
     [data-testid="stSidebarCollapsedControl"] {
         position: fixed !important;
         top: 60px !important;            /* 뉴스 티커(50px) 바로 아래 */
-        left: 10px !important;           /* 왼쪽 여백 */
-        z-index: 2147483647 !important;  /* 최상단 레이어 (가려짐 방지) */
-        background-color: #10B981 !important; /* 초록색 배경 (눈에 띄게) */
-        color: #FFFFFF !important;       /* 아이콘 흰색 */
-        border-radius: 50% !important;   /* 동그라미 모양 */
-        width: 44px !important;
-        height: 44px !important;
+        left: 0px !important;            /* 왼쪽 벽에 딱 붙임 */
+        width: 30px !important;          /* 너비는 좁게 */
+        height: 120px !important;        /* [핵심] 높이를 아주 길게 설정 (가려짐 방지) */
+        z-index: 2147483647 !important;  /* 최상단 */
+        background-color: #10B981 !important; /* 녹색 */
+        border-radius: 0 10px 10px 0 !important; /* 오른쪽만 둥글게 (탭 모양) */
+        border: 1px solid #065F46 !important;
+        border-left: none !important;
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.5) !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 2px 2px 8px rgba(0,0,0,0.5) !important;
-        transition: transform 0.2s ease;
+        transition: all 0.2s ease;
+        opacity: 0.9 !important;
     }
     
-    /* 버튼 아이콘 색상 강제 */
+    /* 버튼 아이콘 (화살표) 크기 및 색상 */
     [data-testid="stSidebarCollapsedControl"] > svg,
     [data-testid="stSidebarCollapsedControl"] > img {
         fill: #FFFFFF !important;
         color: #FFFFFF !important;
-        width: 24px !important;
-        height: 24px !important;
+        width: 20px !important;
+        height: 20px !important;
     }
 
     /* 버튼 호버 효과 */
     [data-testid="stSidebarCollapsedControl"]:hover {
-        transform: scale(1.1);
+        width: 40px !important; /* 호버 시 조금 더 튀어나옴 */
         background-color: #059669 !important;
+        opacity: 1 !important;
     }
 
-    /* 스트림릿 기본 헤더 숨김 (버튼 중복 방지) */
+    /* 스트림릿 기본 헤더 숨김 (버튼 간섭 제거) */
     header[data-testid="stHeader"] {
-        z-index: 1 !important; /* 티커보다 뒤로 보냄 */
+        z-index: 1 !important; 
     }
 
     /* ------------------------------------------------------- */
@@ -95,7 +98,7 @@ st.markdown("""
         overflow: hidden;
         white-space: nowrap;
         padding: 12px 0;
-        z-index: 999999; /* 버튼보다는 낮게 설정 */
+        z-index: 999999;
         display: flex;
         align-items: center;
     }
