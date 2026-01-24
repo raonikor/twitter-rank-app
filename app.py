@@ -42,35 +42,34 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
     /* ======================================================= */
-    /* [수정됨] 사이드바 버튼 위치: 50px (티커 바로 아래) */
+    /* [수정됨] 사이드바 버튼 위치: 0px (티커 위로 겹침) */
     /* ======================================================= */
     
-    /* 1. 스트림릿 기본 헤더 위치 조정 */
+    /* 1. 스트림릿 기본 헤더를 다시 맨 위(0px)로 올림 */
     header[data-testid="stHeader"] {
-        top: 50px !important;            /* [수정] 50px 아래로 내림 */
+        top: 10px !important;             /* 맨 위로 원복 */
         background-color: transparent !important; 
-        z-index: 1000002 !important;
+        z-index: 1000002 !important;     /* 티커(1000001)보다 위에 배치하여 버튼 클릭 가능하게 함 */
         height: auto !important;
     }
 
-    /* 2. 사이드바 여는 버튼 (화살표 >) 위치 및 디자인 */
+    /* 2. 사이드바 여는 버튼 (화살표 >) 디자인 및 위치 */
     [data-testid="stSidebarCollapsedControl"] {
         position: fixed !important;
-        top: 50px !important;            /* [수정] 50px 아래로 내림 */
+        top: 10px !important;             /* [요청하신 부분] 0px 위치 */
         left: 0px !important;            /* 왼쪽 벽 */
-        z-index: 1000003 !important;     /* 최상단 */
+        z-index: 1000003 !important;     /* 최상단 (헤더보다 위) */
         
         background-color: #10B981 !important; /* 초록색 배경 */
-        border-radius: 0 0 10px 0 !important; /* 오른쪽 아래 둥글게 */
+        border-radius: 0 0 10px 0 !important; /* 오른쪽 아래만 둥글게 */
         color: white !important;
-        padding: 10px !important;
-        width: 50px !important;          /* 너비 */
-        height: 50px !important;         /* 높이 */
+        padding: 10px !important;        /* 크기 조절 */
+        width: 50px !important;          /* 버튼 너비 */
+        height: 50px !important;         /* 버튼 높이 (티커 높이와 맞춤) */
         
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.3) !important;
     }
     
     /* 버튼 아이콘 색상 */
@@ -87,7 +86,7 @@ st.markdown("""
     
     /* 4. 툴바/메뉴 위치 조정 */
     [data-testid="stToolbar"] {
-        top: 55px !important; /* [수정] 버튼 위치에 맞춰서 조금 내림 */
+        top: 5px !important;
         right: 10px !important;
         z-index: 1000003 !important;
     }
@@ -106,10 +105,10 @@ st.markdown("""
         overflow: hidden;
         white-space: nowrap;
         padding: 12px 0;
-        z-index: 1000001 !important; 
+        z-index: 1000001 !important; /* 버튼(1000003)보다는 아래 */
         display: flex;
         align-items: center;
-        padding-left: 10px; /* 버튼이 내려갔으므로 여백 원복 */
+        padding-left: 60px; /* [수정] 버튼이 가리는 만큼 왼쪽 여백 추가 */
     }
     
     .ticker-wrapper {
@@ -144,7 +143,7 @@ st.markdown("""
 
     /* 메인 컨텐츠 상단 여백 확보 */
     .main .block-container {
-        padding-top: 100px !important; /* 티커(50) + 버튼영역(50) 만큼 띄움 */
+        padding-top: 60px !important; /* 티커 높이만큼만 띄움 */
     }
     
     /* [배너 스타일] */
@@ -265,16 +264,12 @@ def get_sheet_data():
         df = conn.read(ttl="0") 
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
-            
-            # 텍스트 컬럼 안전 처리
             cols_to_check = ['handle', 'name', 'category', 'recent_interest', 'note']
             for col in cols_to_check:
                 if col not in df.columns: df[col] = "" 
                 df[col] = df[col].fillna("").astype(str)
-            
             mask = (df['name'] == "") | (df['name'] == "nan")
             df.loc[mask, 'name'] = df.loc[mask, 'handle']
-            
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'recent_interest', 'note'])
 
