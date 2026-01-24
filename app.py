@@ -130,7 +130,7 @@ st.markdown("""
 
     /* 메인 컨텐츠 상단 여백 확보 */
     .main .block-container {
-        padding-top: 100px !important; /* 헤더가 내려왔으므로 더 많이 띄움 */
+        padding-top: 50px !important; /* 헤더가 내려왔으므로 더 많이 띄움 */
     }
     
     /* [배너 스타일] */
@@ -372,6 +372,7 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
+
 
 
 
