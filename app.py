@@ -41,51 +41,47 @@ st.markdown("""
     .stApp { background-color: #0F1115; color: #FFFFFF; }
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
-    /* ------------------------------------------------------- */
-    /* [위치 수정] 사이드바 버튼 -> 왼쪽 상단 (티커 바로 아래) */
-    /* ------------------------------------------------------- */
+    /* ======================================================= */
+    /* [긴급 수정] 사이드바 버튼 강제 이동 (헤더 전체 이동) */
+    /* ======================================================= */
+    
+    /* 1. 스트림릿 기본 헤더(버튼이 들어있는 곳)를 뉴스 티커(50px) 아래로 밀어버림 */
+    header[data-testid="stHeader"] {
+        top: 60px !important;            /* 티커 아래 60px 지점에 배치 */
+        background-color: transparent !important; /* 배경 투명하게 (겹침 방지) */
+        z-index: 1000 !important;        /* 티커보다는 아래, 콘텐츠보다는 위 */
+        height: auto !important;         /* 높이 자동 */
+    }
+
+    /* 2. 사이드바 여는 버튼 (화살표 >) 디자인 변경 */
     [data-testid="stSidebarCollapsedControl"] {
-        position: fixed !important;
-        top: 150px !important;           /* 뉴스 티커(50px) 바로 아래 */
-        left: 0px !important;           /* 왼쪽 벽에 붙임 */
-        
-        width: 40px !important;         /* 너비 */
-        height: 50px !important;        /* 높이 */
-        
-        z-index: 2147483647 !important; /* 최상단 레이어 */
-        
-        background-color: #10B981 !important; /* 녹색 배경 */
-        border-radius: 0 0 12px 0 !important; /* 오른쪽 아래만 둥글게 (ㄱ자 모양) */
+        background-color: #10B981 !important; /* 초록색 배경 */
         border: 1px solid #065F46 !important;
-        border-left: none !important;
-        border-top: none !important;
+        border-radius: 8px !important;
+        color: white !important;
+        padding: 5px !important;
         
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.3) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        transition: all 0.2s ease;
-        opacity: 0.95 !important;
+        /* 혹시 몰라 위치도 강제로 다시 잡음 */
+        position: fixed !important;
+        top: 60px !important;
+        left: 10px !important;
+        z-index: 1000002 !important;
+    }
+
+    /* 3. 모바일용 햄버거 메뉴 버튼 (혹시 이것일 수도 있어서 같이 처리) */
+    button[kind="header"] {
+        background-color: rgba(16, 185, 129, 0.2) !important;
+        border-radius: 8px !important;
     }
     
-    /* 버튼 아이콘 스타일 */
-    [data-testid="stSidebarCollapsedControl"] > svg,
-    [data-testid="stSidebarCollapsedControl"] > img {
-        fill: #FFFFFF !important;
-        color: #FFFFFF !important;
-        width: 24px !important;
-        height: 24px !important;
+    /* 4. 툴바/메뉴 등 불필요한 요소 숨김 (깔끔하게) */
+    [data-testid="stToolbar"] {
+        top: 70px !important;
     }
 
-    /* 버튼 호버 효과 */
-    [data-testid="stSidebarCollapsedControl"]:hover {
-        background-color: #059669 !important;
-        width: 45px !important; /* 호버 시 약간 넓어짐 */
-    }
+    /* ======================================================= */
 
-    /* ------------------------------------------------------- */
     /* [뉴스 티커] 상단 고정 스타일 */
-    /* ------------------------------------------------------- */
     .ticker-container {
         position: fixed;
         top: 0;
@@ -97,7 +93,7 @@ st.markdown("""
         overflow: hidden;
         white-space: nowrap;
         padding: 12px 0;
-        z-index: 999999;
+        z-index: 1000001 !important; /* 헤더보다 훨씬 높게 설정 */
         display: flex;
         align-items: center;
     }
@@ -132,9 +128,9 @@ st.markdown("""
         100% { transform: translate3d(-100%, 0, 0); }
     }
 
-    /* 메인 컨텐츠 상단 여백 확보 (티커에 가려지지 않게) */
+    /* 메인 컨텐츠 상단 여백 확보 */
     .main .block-container {
-        padding-top: 80px !important;
+        padding-top: 100px !important; /* 헤더가 내려왔으므로 더 많이 띄움 */
     }
     
     /* [배너 스타일] */
@@ -157,9 +153,7 @@ st.markdown("""
         display: block;
     }
 
-    /* ------------------------------------------------------- */
     /* 사이드바 스타일 */
-    /* ------------------------------------------------------- */
     [data-testid="stSidebar"] .stRadio [role="radiogroup"] { 
         display: flex; flex-direction: column !important; gap: 6px; 
     }
@@ -378,4 +372,3 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
-
