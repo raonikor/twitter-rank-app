@@ -42,22 +42,35 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
     /* ------------------------------------------------------- */
-    /* [수정] 사이드바 열기 버튼 위치 조정 (모바일 대응) */
+    /* [긴급 수정] 사이드바 열기 버튼 (> 화살표) 위치 강제 조정 */
     /* ------------------------------------------------------- */
     [data-testid="stSidebarCollapsedControl"] {
-        top: 60px !important;       /* 뉴스 티커 높이(50px)보다 아래로 내림 */
-        left: 10px !important;      /* 왼쪽 여백 */
-        z-index: 1000001 !important; /* 티커(999999)보다 위에 표시 */
-        background-color: rgba(30, 31, 32, 0.8); /* 잘 보이게 반투명 배경 추가 */
-        border-radius: 8px;
-        padding: 4px;
-        transition: all 0.3s ease;
+        position: fixed !important;
+        top: 60px !important;           /* 티커(50px)보다 더 아래로 내림 */
+        left: 10px !important;          /* 왼쪽 여백 */
+        z-index: 2147483647 !important; /* 지구상 모든 요소보다 위에 표시 (최대값) */
+        background-color: rgba(20, 22, 25, 0.9) !important; /* 배경색 추가 (글자 겹침 방지) */
+        border: 1px solid #333 !important;
+        border-radius: 8px !important;
+        padding: 4px !important;
+        width: 40px !important;
+        height: 40px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.5) !important;
     }
     
-    /* 버튼에 마우스 올렸을 때 강조 */
+    /* 버튼 내부 아이콘 색상 강제 지정 */
+    [data-testid="stSidebarCollapsedControl"] svg {
+        fill: #FFFFFF !important;
+        color: #FFFFFF !important;
+    }
+
+    /* 버튼 호버 효과 */
     [data-testid="stSidebarCollapsedControl"]:hover {
-        background-color: #10B981;
-        color: white;
+        background-color: #10B981 !important;
+        border-color: #10B981 !important;
     }
 
     /* ------------------------------------------------------- */
@@ -234,12 +247,16 @@ def get_sheet_data():
         df = conn.read(ttl="0") 
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
+            
+            # 텍스트 컬럼 안전 처리
             cols_to_check = ['handle', 'name', 'category', 'recent_interest', 'note']
             for col in cols_to_check:
                 if col not in df.columns: df[col] = "" 
                 df[col] = df[col].fillna("").astype(str)
+            
             mask = (df['name'] == "") | (df['name'] == "nan")
             df.loc[mask, 'name'] = df.loc[mask, 'handle']
+            
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'recent_interest', 'note'])
 
