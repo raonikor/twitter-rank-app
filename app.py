@@ -42,41 +42,53 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E1F20; border-right: 1px solid #333; }
     
     /* ======================================================= */
-    /* [긴급 수정] 사이드바 버튼 강제 이동 (헤더 전체 이동) */
+    /* [수정됨] 사이드바 버튼 위치: 0px (티커 위로 겹침) */
     /* ======================================================= */
     
-    /* 1. 스트림릿 기본 헤더(버튼이 들어있는 곳)를 뉴스 티커(50px) 아래로 밀어버림 */
+    /* 1. 스트림릿 기본 헤더를 다시 맨 위(0px)로 올림 */
     header[data-testid="stHeader"] {
-        top: 0px !important;            /* 티커 아래 60px 지점에 배치 */
-        background-color: transparent !important; /* 배경 투명하게 (겹침 방지) */
-        z-index: 100 !important;        /* 티커보다는 아래, 콘텐츠보다는 위 */
-        height: auto !important;         /* 높이 자동 */
+        top: 0px !important;             /* 맨 위로 원복 */
+        background-color: transparent !important; 
+        z-index: 1000002 !important;     /* 티커(1000001)보다 위에 배치하여 버튼 클릭 가능하게 함 */
+        height: auto !important;
     }
 
-    /* 2. 사이드바 여는 버튼 (화살표 >) 디자인 변경 */
+    /* 2. 사이드바 여는 버튼 (화살표 >) 디자인 및 위치 */
     [data-testid="stSidebarCollapsedControl"] {
-        background-color: #10B981 !important; /* 초록색 배경 */
-        border: 1px solid #065F46 !important;
-        border-radius: 8px !important;
-        color: white !important;
-        padding: 5px !important;
-        
-        /* 혹시 몰라 위치도 강제로 다시 잡음 */
         position: fixed !important;
-        top: 60px !important;
-        left: 10px !important;
-        z-index: 1000002 !important;
+        top: 0px !important;             /* [요청하신 부분] 0px 위치 */
+        left: 0px !important;            /* 왼쪽 벽 */
+        z-index: 1000003 !important;     /* 최상단 (헤더보다 위) */
+        
+        background-color: #10B981 !important; /* 초록색 배경 */
+        border-radius: 0 0 10px 0 !important; /* 오른쪽 아래만 둥글게 */
+        color: white !important;
+        padding: 10px !important;        /* 크기 조절 */
+        width: 50px !important;          /* 버튼 너비 */
+        height: 50px !important;         /* 버튼 높이 (티커 높이와 맞춤) */
+        
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    /* 버튼 아이콘 색상 */
+    [data-testid="stSidebarCollapsedControl"] svg {
+        fill: white !important;
+        color: white !important;
     }
 
-    /* 3. 모바일용 햄버거 메뉴 버튼 (혹시 이것일 수도 있어서 같이 처리) */
+    /* 3. 모바일용 햄버거 메뉴 버튼 등 기타 요소 */
     button[kind="header"] {
         background-color: rgba(16, 185, 129, 0.2) !important;
         border-radius: 8px !important;
     }
     
-    /* 4. 툴바/메뉴 등 불필요한 요소 숨김 (깔끔하게) */
+    /* 4. 툴바/메뉴 위치 조정 */
     [data-testid="stToolbar"] {
-        top: 70px !important;
+        top: 5px !important;
+        right: 10px !important;
+        z-index: 1000003 !important;
     }
 
     /* ======================================================= */
@@ -93,9 +105,10 @@ st.markdown("""
         overflow: hidden;
         white-space: nowrap;
         padding: 12px 0;
-        z-index: 1000001 !important; /* 헤더보다 훨씬 높게 설정 */
+        z-index: 1000001 !important; /* 버튼(1000003)보다는 아래 */
         display: flex;
         align-items: center;
+        padding-left: 60px; /* [수정] 버튼이 가리는 만큼 왼쪽 여백 추가 */
     }
     
     .ticker-wrapper {
@@ -130,7 +143,7 @@ st.markdown("""
 
     /* 메인 컨텐츠 상단 여백 확보 */
     .main .block-container {
-        padding-top: 50px !important; /* 헤더가 내려왔으므로 더 많이 띄움 */
+        padding-top: 60px !important; /* 티커 높이만큼만 띄움 */
     }
     
     /* [배너 스타일] */
@@ -251,16 +264,12 @@ def get_sheet_data():
         df = conn.read(ttl="0") 
         if df is not None and not df.empty:
             df['followers'] = pd.to_numeric(df['followers'], errors='coerce').fillna(0)
-            
-            # 텍스트 컬럼 안전 처리
             cols_to_check = ['handle', 'name', 'category', 'recent_interest', 'note']
             for col in cols_to_check:
                 if col not in df.columns: df[col] = "" 
                 df[col] = df[col].fillna("").astype(str)
-            
             mask = (df['name'] == "") | (df['name'] == "nan")
             df.loc[mask, 'name'] = df.loc[mask, 'handle']
-            
         return df
     except: return pd.DataFrame(columns=['handle', 'name', 'followers', 'category', 'recent_interest', 'note'])
 
@@ -372,8 +381,3 @@ elif menu == "텔레그램 이벤트": event_logic.render_event_page(conn)
 elif menu == "관리자 페이지" and is_admin:
     st.title("🛠️ 관리자 대시보드"); st.info("관리자 모드"); st.divider()
     if st.button("🔄 데이터 동기화", type="primary"): st.cache_data.clear(); st.rerun()
-
-
-
-
-
